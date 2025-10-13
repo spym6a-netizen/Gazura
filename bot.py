@@ -4060,6 +4060,19 @@ async def cmd_clearauction(message: types.Message):
         await message.answer(f"❌ Помилка при очищенні аукціону: {e}")
         log.error(f"Помилка очищення аукціону: {e}")
 #^^0000^^
+
+import os
+
+QUESTIONS_PATH = "questions.json"
+
+# Додай цю перевірку на початку
+print(f"📁 Поточний каталог: {os.getcwd()}")
+print(f"📁 Файл питань: {QUESTIONS_PATH}")
+print(f"📁 Файл існує: {os.path.exists(QUESTIONS_PATH)}")
+
+if os.path.exists(QUESTIONS_PATH):
+    print(f"📁 Права доступу: {oct(os.stat(QUESTIONS_PATH).st_mode)[-3:]}")
+    
         # ========== ЗАПУСК БОТА ==========
 async def main():
     """Головна асинхронна функція"""
