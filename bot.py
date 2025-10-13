@@ -1517,8 +1517,39 @@ async def cb_game_quiz(call: types.CallbackQuery):
     try:
         with open(QUESTIONS_PATH, 'r', encoding='utf-8') as f:
             questions = json.load(f)
-        question = random.choice(questions)
-    except:
+        
+        if not questions:
+            await call.message.edit_text(
+                "❌ <b>Файл з питаннями порожній!</b>\n\n"
+                "Додайте питання до файлу questions.json",
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("⬅️ Назад", callback_data="menu_games")
+                )
+            )
+            return
+        
+        # Фільтруємо тільки валідні питання (тепер з полем "answer")
+        valid_questions = []
+        for q in questions:
+            if ('question' in q and 'options' in q and 'answer' in q and 
+                isinstance(q['options'], list) and len(q['options']) > 0 and
+                0 <= q['answer'] < len(q['options'])):
+                valid_questions.append(q)
+        
+        if not valid_questions:
+            await call.message.edit_text(
+                "❌ <b>Немає валідних питань!</b>\n\n"
+                "Перевірте формат питань у файлі questions.json\n"
+                "Потрібні поля: question, options, answer",
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("⬅️ Назад", callback_data="menu_games")
+                )
+            )
+            return
+            
+        question = random.choice(valid_questions)
+        
+    except FileNotFoundError:
         await call.message.edit_text(
             "❌ <b>Файл з питаннями не знайдено!</b>\n\n"
             "Створіть файл questions.json з питаннями.",
@@ -1527,10 +1558,29 @@ async def cb_game_quiz(call: types.CallbackQuery):
             )
         )
         return
+    except json.JSONDecodeError:
+        await call.message.edit_text(
+            "❌ <b>Помилка в форматі файлу питань!</b>\n\n"
+            "Перевірте правильність JSON формату.",
+            reply_markup=InlineKeyboardMarkup().add(
+                InlineKeyboardButton("⬅️ Назад", callback_data="menu_games")
+            )
+        )
+        return
+    except Exception as e:
+        await call.message.edit_text(
+            f"❌ <b>Помилка завантаження питань:</b>\n{e}",
+            reply_markup=InlineKeyboardMarkup().add(
+                InlineKeyboardButton("⬅️ Назад", callback_data="menu_games")
+            )
+        )
+        return
     
+    # Створюємо клавіатуру з варіантами відповідей (тепер з 'answer')
     kb = InlineKeyboardMarkup(row_width=2)
     for i, option in enumerate(question["options"]):
-        kb.insert(InlineKeyboardButton(option, callback_data=f"quiz_answer_{i}_{question['correct']}"))
+        kb.insert(InlineKeyboardButton(option, callback_data=f"quiz_answer_{i}_{question['answer']}"))
+    
     kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_games"))
     
     await call.message.edit_text(
@@ -1544,8 +1594,17 @@ async def cb_game_quiz(call: types.CallbackQuery):
 async def cb_quiz_answer(call: types.CallbackQuery):
     user_id = call.from_user.id
     data_parts = call.data.split('_')
-    answer_index = int(data_parts[2])
-    correct_index = int(data_parts[3])
+    
+    if len(data_parts) != 4:
+        await call.answer("❌ Помилка в форматі відповіді!", show_alert=True)
+        return
+    
+    try:
+        answer_index = int(data_parts[2])
+        correct_index = int(data_parts[3])  # Тепер це 'answer'
+    except ValueError:
+        await call.answer("❌ Помилка в форматі відповіді!", show_alert=True)
+        return
     
     # Бонус XP для Студента
     role = get_user_role(user_id)
