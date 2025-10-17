@@ -6881,7 +6881,35 @@ async def cmd_banlist(message: types.Message):
     )
     
     await message.answer(text)
+@dp.message_handler(commands=['us'])
+async def cmd_us(message: types.Message):
+    """Показати всіх гравців"""
+    if not is_admin(message.from_user.id):
+        await message.answer("❌ Доступ заборонено!")
+        return
+    
+    cursor.execute("SELECT user_id, username, level, coins FROM players ORDER BY coins DESC")
+    users = cursor.fetchall()
+    
+    text = f"👥 <b>Всі гравці ({len(users)}):</b>\n\n"
+    
+    for user_id, username, level, coins in users:
+        username = username or f"User{user_id}"
+        text += f"👤 {username}\n🆔 {user_id} | 🎯 {level} | 💰 {coins} ✯\n\n"
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("🔄 Оновити", callback_data="refresh_us"))
+    
+    await message.answer(text, reply_markup=kb)
 
+@dp.callback_query_handler(lambda c: c.data == 'refresh_us')
+async def cb_refresh_us(call: types.CallbackQuery):
+    """Оновити список гравців"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await cmd_us(call.message)
+    await call.answer("✅ Список оновлено!")
 
         # ========== ЗАПУСК БОТА ==========
 async def main():
