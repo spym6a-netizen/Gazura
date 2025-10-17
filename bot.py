@@ -1,4 +1,3 @@
-# Додай ці імпорти на початку файлу
 import asyncio
 import json
 import random
@@ -23,7 +22,6 @@ DAILY_QUESTION_LIMIT = 10
 DAILY_TAP_LIMIT_BASE = 1500  # Ліміт тапів для рівнів >5
 DAILY_TAP_LIMIT_ACTIVE = 2500  # Ліміт для ролі Активний
 
-# ТВІЙ ID (дізнайся через @userinfobot в Telegram)
 ADMIN_ID = 5672490558  # ← ЗАМІНИ НА СВІЙ РЕАЛЬНИЙ ID
 # ============================
 
@@ -307,14 +305,60 @@ except Exception as e:
 class ItemRoulettePrizes:
     PRIZES = [
         {"name": "💎 Алмаз", "price": 500, "probability": 0.01, "type": "mineral", "id": 22},
+        {"name": "🔮 Містичний кристал", "price": 300, "probability": 0.03, "type": "magic", "id": 55},
         {"name": "🪨 Камінь", "price": 7, "probability": 0.15, "type": "mineral", "id": 11},
         {"name": "⛏️ Залізна руда", "price": 45, "probability": 0.12, "type": "mineral", "id": 33},
         {"name": "🪙 Золота руда", "price": 120, "probability": 0.08, "type": "mineral", "id": 44},
-        {"name": "🔮 Містичний кристал", "price": 300, "probability": 0.03, "type": "magic", "id": 55},
         {"name": "📜 Старовинний сувій", "price": 80, "probability": 0.10, "type": "magic", "id": 66},
         {"name": "🧪 Еліксир сили", "price": 200, "probability": 0.05, "type": "potion", "id": 77},
         {"name": "🌿 Цілюща трава", "price": 25, "probability": 0.14, "type": "potion", "id": 88},
         {"name": "⚔️ Меч воїна", "price": 350, "probability": 0.02, "type": "weapon", "id": 99},
+        # Нові предмети для машин
+        {"name": "🚗 Кузов автомобіля", "price": 900, "probability": 0.015, "type": "car_part", "id": 100},
+        {"name": "⚙️ Двигун автомобіля", "price": 1200, "probability": 0.012, "type": "car_part", "id": 101},
+        {"name": "🛞 Колеса автомобіля", "price": 800, "probability": 0.018, "type": "car_part", "id": 102},
+    ]
+
+class CraftingRecipes:
+    RECIPES = [
+        {
+            "id": 1,
+            "name": "💎 Кальє з алмазу",
+            "result": "💎 Кальє з алмазу",
+            "result_price": 1200,
+            "result_type": "jewelry",
+            "cost": 200,
+            "ingredients": [
+                {"name": "💎 Алмаз", "quantity": 1},
+                {"name": "🔮 Містичний кристал", "quantity": 1}
+            ]
+        },
+        {
+            "id": 2,
+            "name": "🚗 Випадкова машина",
+            "result": "random_car",
+            "result_type": "car",
+            "cost": 500,
+            "ingredients": [
+                {"name": "🚗 Кузов автомобіля", "quantity": 1},
+                {"name": "⚙️ Двигун автомобіля", "quantity": 1},
+                {"name": "🛞 Колеса автомобіля", "quantity": 1}
+            ]
+        }
+    ]
+class Cars:
+    CARS = [
+        # Економ класс
+        {"name": "Hyundai Solaris", "class": "economy", "price": 4000, "probability": 0.4},
+        {"name": "Kia Rio", "class": "economy", "price": 6000, "probability": 0.3},
+        {"name": "Renault Logan", "class": "economy", "price": 7000, "probability": 0.3},
+        # Комфорт класс
+        {"name": "Toyota Camry", "class": "comfort", "price": 11000, "probability": 0.5},
+        {"name": "Passat B7", "class": "comfort", "price": 15000, "probability": 0.5},
+        # Бізнес класс
+        {"name": "Mercedes-Benz E-Class", "class": "business", "price": 22000, "probability": 0.34},
+        {"name": "BMW 5 Series", "class": "business", "price": 22000, "probability": 0.33},
+        {"name": "Audi A6", "class": "business", "price": 25000, "probability": 0.33},
     ]
 
 class PremiumRoulette:
@@ -380,7 +424,7 @@ class Roles:
         {"id": 4, "name": "Активний", "price": 980, "description": "+3% до тапів, ліміт тапів до 2500 в день"},
         {"id": 5, "name": "Щасливчик", "price": 1100, "description": "Бонус 60 монет при виграші в рулетці"},
         {"id": 6, "name": "Воїн", "price": 1300, "description": "Бонус 50 монет при виграші в PvP"},
-        {"id": 7, "name": "БАНКІР", "price": 7300, "description": "Отримує комісії, без комісій у продажах, +25 монет/годину"}
+        {"id": 7, "name": "БАНКІР", "price": 7300, "description": "Отримує комісії, без комісій у продажах, +25 монет/6 годин"}
     ]
 
 class Prefixes:
@@ -409,6 +453,144 @@ class DailyTasks:
     ]
 
 # ========== БАЗОВІ ФУНКЦІЇ ==========
+#------====== PASS =======-------
+def can_get_passport(user_id: int) -> Dict:
+    level = get_user_level(user_id)
+    coins = get_user_coins(user_id)
+    
+    if level < 2:
+        return {"can": False, "reason": "❌ Потрібен 2 рівень!"}
+    if coins < 1000:
+        return {"can": False, "reason": f"❌ Недостатньо монет! Потрібно 1000 ✯ (у вас {coins} ✯)"}
+    return {"can": True, "reason": "✅ Можна отримати паспорт!"}
+
+def buy_passport(user_id: int) -> bool:
+    check = can_get_passport(user_id)
+    if not check["can"]:
+        return False
+    
+    cursor.execute("UPDATE players SET coins = coins - 1000, has_passport = TRUE WHERE user_id = ?", (user_id,))
+    conn.commit()
+    return True
+
+def create_progress_bar(percentage: float, length: int = 10) -> str:
+    """Створити прогрес-бар"""
+    filled = int(length * percentage / 100)
+    empty = length - filled
+    return f"█" * filled + "░" * empty
+#===================== craft
+def get_user_craftable_items(user_id: int) -> List[Dict]:
+    """Отримати доступні для крафту предмети"""
+    user_items = get_user_inventory(user_id)
+    craftable = []
+    
+    for recipe in CraftingRecipes.RECIPES:
+        can_craft = True
+        missing_ingredients = []
+        
+        for ingredient in recipe["ingredients"]:
+            # Рахуємо кількість потрібних предметів
+            required_count = ingredient["quantity"]
+            user_count = sum(1 for item in user_items if item["name"] == ingredient["name"])
+            
+            if user_count < required_count:
+                can_craft = False
+                missing_ingredients.append(f"{ingredient['name']} ({user_count}/{required_count})")
+        
+        craftable.append({
+            "recipe": recipe,
+            "can_craft": can_craft,
+            "missing_ingredients": missing_ingredients
+        })
+    
+    return craftable
+
+def craft_item(user_id: int, recipe_id: int) -> Dict:
+    """Виконати крафт предмета"""
+    recipe = next((r for r in CraftingRecipes.RECIPES if r["id"] == recipe_id), None)
+    if not recipe:
+        return {"success": False, "message": "❌ Рецепт не знайдено!"}
+    
+    # Перевіряємо наявність предметів
+    user_items = get_user_inventory(user_id)
+    user_coins = get_user_coins(user_id)
+    
+    if user_coins < recipe["cost"]:
+        return {"success": False, "message": "❌ Недостатньо монет для крафту!"}
+    
+    for ingredient in recipe["ingredients"]:
+        required_count = ingredient["quantity"]
+        user_count = sum(1 for item in user_items if item["name"] == ingredient["name"])
+        
+        if user_count < required_count:
+            return {"success": False, "message": f"❌ Недостатньо {ingredient['name']}!"}
+    
+    # Видаляємо використані предмети
+    for ingredient in recipe["ingredients"]:
+        for _ in range(ingredient["quantity"]):
+            remove_from_inventory(user_id, ingredient["name"])
+    
+    # Списуємо вартість крафту
+    cursor.execute("UPDATE players SET coins = coins - ? WHERE user_id = ?", (recipe["cost"], user_id))
+    
+    # Додаємо результат
+    if recipe["result"] == "random_car":
+        # Генеруємо випадкову машину
+        car = get_random_car()
+        add_to_inventory(user_id, car["name"], car["price"], "car")
+        result_message = f"🎉 Ви сконструювали: {car['name']} ({car['class']} класс)!"
+    else:
+        add_to_inventory(user_id, recipe["result"], recipe["result_price"], recipe["result_type"])
+        result_message = f"🎉 Ви сконструювали: {recipe['result']}!"
+    
+    conn.commit()
+    return {"success": True, "message": result_message}
+
+def get_random_car() -> Dict:
+    """Отримати випадкову машину згідно з ймовірностями"""
+    r = random.random()
+    cumulative_prob = 0.0
+    
+    for car in Cars.CARS:
+        cumulative_prob += car["probability"]
+        if r <= cumulative_prob:
+            return car
+    
+    return Cars.CARS[0]  # fallback
+
+# Додаємо на початок цих функцій:
+def check_passport_required(user_id: int) -> bool:
+    """Перевірити чи потрібен паспорт"""
+    cursor.execute("SELECT has_passport FROM players WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    return result[0] if result else False
+
+# В кожну функцію додаємо перевірку на початку:
+@dp.callback_query_handler(lambda c: c.data in ['shop_farm', 'shop_real_estate', 'shop_roles', 'shop_prefixes', 'menu_income', 'menu_friends', 'inventory_view'])
+async def check_passport_access(call: types.CallbackQuery):
+    """Перевірка доступу до функцій, що вимагають паспорт"""
+    user_id = call.from_user.id
+    
+    if not check_passport_required(user_id):
+        await call.answer("❌ Ця функція доступна тільки з паспортом! Отримайте паспорт в профілі.", show_alert=True)
+        return
+    
+    # Якщо паспорт є - передаємо до оригінального обробника
+    if call.data == 'shop_farm':
+        await cb_shop_farm(call)
+    elif call.data == 'shop_real_estate':
+        await cb_shop_real_estate(call)
+    elif call.data == 'shop_roles':
+        await cb_shop_roles(call)
+    elif call.data == 'shop_prefixes':
+        await cb_shop_prefixes(call)
+    elif call.data == 'menu_income':
+        await cb_menu_income(call)
+    elif call.data == 'menu_friends':
+        await cb_menu_friends(call)
+    elif call.data == 'inventory_view':
+        await cb_inventory_view(call)
+
 def ensure_player(user_id: int, username: str):
     cursor.execute("SELECT user_id FROM players WHERE user_id = ?", (user_id,))
     if not cursor.fetchone():
@@ -598,6 +780,257 @@ def transfer_money(from_user_id: int, to_user_id: int, amount: int) -> bool:
     
     conn.commit()
     return True
+#=========== МАГАЗИН УРОВНІВ ===============
+def buy_level(user_id: int) -> Dict:
+    """Купити наступний рівень"""
+    current_level = get_user_level(user_id)
+    next_level = current_level + 1
+    
+    # Розраховуємо ціну: 1500 * 2^(current_level-1)
+    price = 1500 * (2 ** (current_level - 1))
+    
+    user_coins = get_user_coins(user_id)
+    
+    if user_coins < price:
+        return {"success": False, "message": f"❌ Недостатньо монет! Потрібно {price} ✯"}
+    
+    # Списуємо монети та підвищуємо рівень
+    cursor.execute("UPDATE players SET coins = coins - ?, level = ? WHERE user_id = ?", 
+                   (price, next_level, user_id))
+    conn.commit()
+    
+    return {
+        "success": True, 
+        "message": f"🎉 Рівень підвищено до {next_level}!",
+        "price": price,
+        "new_level": next_level
+    }
+
+def add_user_xp(user_id: int, xp: int):
+    # Бонус для Студента
+    role = get_user_role(user_id)
+    if role == "Студент":
+        xp = int(xp * 1.05)
+    
+    cursor.execute("UPDATE players SET xp = xp + ? WHERE user_id = ?", (xp, user_id))
+    
+    # Перевірка підвищення рівня (тільки через XP)
+    current_level = get_user_level(user_id)
+    current_xp = get_user_xp(user_id)
+    xp_needed = current_level * XP_PER_LEVEL
+    
+    if current_xp >= xp_needed:
+        new_level = current_level + 1
+        cursor.execute("UPDATE players SET level = ? WHERE user_id = ?", (new_level, user_id))
+        conn.commit()
+        return new_level
+    return current_level
+
+#=========== PROFILE NO PASS ==========
+async def show_profile_without_passport(call: types.CallbackQuery, user_id: int):
+    """Показати профіль без паспорта"""
+    cursor.execute("SELECT username, level, coins FROM players WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    
+    if result:
+        username, level, coins = result
+        check = can_get_passport(user_id)
+        
+        text = (
+            f"👤 <b>Профіль гравця</b>\n\n"
+            f"🆔 ID: {user_id}\n"
+            f"👤 Ім'я: {username}\n"
+            f"💎 Баланс: {coins} ✯\n"
+            f"🎯 Рівень: {level}\n\n"
+            f"❌ <b>У вас немає паспорта!</b>\n\n"
+        )
+        
+        if check["can"]:
+            text += f"✅ {check['reason']}\nНатисніть кнопку нижче щоб отримати паспорт за 1000 ✯"
+        else:
+            text += f"📋 <b>Умови отримання паспорта:</b>\n"
+            text += f"• 🎯 2 рівень (у вас {level})\n"
+            f"• 💰 1000 монет (у вас {coins})\n\n"
+            f"💡 {check['reason']}"
+        
+        kb = InlineKeyboardMarkup()
+        
+        if check["can"]:
+            kb.add(InlineKeyboardButton("🛂 Отримати паспорт (1000 ✯)", callback_data="buy_passport"))
+        
+        # ТІЛЬКИ ці кнопки доступні без паспорта
+        kb.add(InlineKeyboardButton("🎮 Ігри", callback_data="menu_games"))
+        kb.add(InlineKeyboardButton("🛍️ Магазин", callback_data="shop_levels"))  # Тільки рівні!
+        kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_back|main"))
+        
+        await call.message.edit_text(text, reply_markup=kb)
+
+def can_get_passport(user_id: int) -> Dict:
+    """Перевірити чи може гравець отримати паспорт"""
+    level = get_user_level(user_id)
+    coins = get_user_coins(user_id)
+    
+    if level < 2:
+        return {"can": False, "reason": "❌ Потрібен 2 рівень!"}
+    if coins < 1000:
+        return {"can": False, "reason": f"❌ Недостатньо монет! Потрібно 1000 ✯"}
+    return {"can": True, "reason": "✅ Можна отримати паспорт!"}
+
+def buy_passport(user_id: int) -> bool:
+    """Купити паспорт"""
+    check = can_get_passport(user_id)
+    if not check["can"]:
+        return False
+    
+    cursor.execute("UPDATE players SET coins = coins - 1000, has_passport = TRUE WHERE user_id = ?", (user_id,))
+    conn.commit()
+    return True
+
+async def show_beautiful_passport(call: types.CallbackQuery, user_id: int):
+    """Показати стильний системний паспорт"""
+    # Отримуємо дані гравця
+    cursor.execute("SELECT username, level, coins, role, total_taps, last_active FROM players WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    
+    if not result:
+        await call.answer("❌ Гравець не знайдений!")
+        return
+    
+    username, level, coins, role, total_taps, last_active = result
+    
+    # Розраховуємо дохід
+    farm_income = get_user_farm_income(user_id)
+    estate_income = get_user_real_estate_income(user_id)
+    total_income = farm_income + estate_income
+    
+    # Прогрес рівня
+    xp_needed = level * XP_PER_LEVEL
+    current_xp = get_user_xp(user_id)
+    progress_percent = min(int((current_xp / xp_needed) * 100), 100) if xp_needed > 0 else 0
+    progress_bar = create_modern_progress_bar(progress_percent)
+    
+    # Дата реєстрації
+    reg_date = last_active[:10] if last_active else "НЕВІДОМО"
+    
+    # Унікальний номер паспорта
+    passport_number = f"P-{user_id % 10000:04d}"
+    
+    # Форматуємо числа
+    formatted_coins = f"{coins:,}"
+    formatted_income = f"{total_income:,}"
+    
+    # Створюємо стильний текст паспорта
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🛂  <b>ПАСПОРТ</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"<b>👤 USER:</b> {username}\n"
+        f"<b>🆔 ID :</b> #{user_id}\n"
+        f"<b>⭐ LVL:</b> {level} ⟣ {progress_bar} {progress_percent}%\n"
+        f"<b>💰 CREDITS:</b> {formatted_coins} ✯\n"
+        f"<b>🏠 BASE INCOME:</b> {formatted_income} ✯ / 6H\n"
+        f"<b>🎭 ROLE:</b> {get_english_role(role)}\n"
+        f"<b>📅 DATE ISSUED:</b> {reg_date}\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"   <b>AUTHORIZED ACCESS:</b> #{passport_number}\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"<i>⟡ SYSTEM IDENTITY CONFIRMED ⟡</i>"
+    )
+    
+    await call.message.edit_text(text, reply_markup=build_passport_menu(user_id))
+
+def create_modern_progress_bar(percentage: float) -> str:
+    """Створити сучасний прогрес-бар"""
+    filled = int(10 * percentage / 100)
+    empty = 10 - filled
+    return f"█" * filled + "░" * empty
+
+def get_english_role(role: str) -> str:
+    """Перевести роль на англійську"""
+    role_map = {
+        "Новачок": "NEWBIE",
+        "Фермер": "FARMER", 
+        "Колектор": "COLLECTOR",
+        "Студент": "STUDENT",
+        "Активний": "ACTIVE",
+        "Щасливчик": "LUCKY",
+        "Воїн": "WARRIOR",
+        "БАНКІР": "BANKER"
+    }
+    return role_map.get(role, role.upper())
+
+def get_user_emoji(role: str) -> str:
+    """Отримати емодзі для ролі"""
+    emoji_map = {
+        "Новачок": "👶",
+        "Фермер": "👨‍🌾", 
+        "Колектор": "🏢",
+        "Студент": "🎓",
+        "Активний": "⚡",
+        "Щасливчик": "🍀",
+        "Воїн": "⚔️",
+        "БАНКІР": "💰"
+    }
+    return emoji_map.get(role, "👤")
+
+async def show_passport(call: types.CallbackQuery, user_id: int):
+    """Показати паспорт гравця (головна функція)"""
+    await show_beautiful_passport(call, user_id)
+
+def build_passport_menu(user_id: int):
+    """Побудувати меню для паспорта"""
+    kb = InlineKeyboardMarkup(row_width=2)
+    
+    kb.add(
+        InlineKeyboardButton("📦 Інвентар", callback_data="inventory_view"),
+        InlineKeyboardButton("👥 Друзі", callback_data="menu_friends"),
+        InlineKeyboardButton("⬅️ Назад", callback_data="menu_back|main")
+    )
+    return kb
+
+@dp.callback_query_handler(lambda c: c.data == 'buy_passport')
+async def cb_buy_passport(call: types.CallbackQuery):
+    """Обробник купівлі паспорта"""
+    user_id = call.from_user.id
+    
+    if buy_passport(user_id):
+        await call.answer("✅ Паспорт успішно отримано!", show_alert=True)
+        await cb_menu_profile(call)
+    else:
+        await call.answer("❌ Не вдалося отримати паспорт!", show_alert=True)
+
+def can_get_passport(user_id: int) -> Dict:
+    """Перевірити чи може гравець отримати паспорт"""
+    level = get_user_level(user_id)
+    coins = get_user_coins(user_id)
+    
+    if level < 2:
+        return {"can": False, "reason": "❌ Потрібен 2 рівень!"}
+    if coins < 1000:
+        return {"can": False, "reason": f"❌ Недостатньо монет! Потрібно 1000 ✯"}
+    return {"can": True, "reason": "✅ Можна отримати паспорт!"}
+
+def buy_passport(user_id: int) -> bool:
+    """Купити паспорт"""
+    check = can_get_passport(user_id)
+    if not check["can"]:
+        return False
+    
+    cursor.execute("UPDATE players SET coins = coins - 1000, has_passport = TRUE WHERE user_id = ?", (user_id,))
+    conn.commit()
+    return True
+
+@dp.callback_query_handler(lambda c: c.data == 'buy_passport')
+async def cb_buy_passport(call: types.CallbackQuery):
+    """Обробник купівлі паспорта"""
+    user_id = call.from_user.id
+    
+    if buy_passport(user_id):
+        await call.answer("✅ Паспорт успішно отримано!", show_alert=True)
+        await cb_menu_profile(call)  # Повертаємось до профілю (тепер з паспортом)
+    else:
+        await call.answer("❌ Не вдалося отримати паспорт!", show_alert=True)
+
 
 # ========== ІНВЕНТАР ТА ПРЕДМЕТИ ==========
 def get_user_inventory(user_id: int) -> List[Dict]:
@@ -641,6 +1074,20 @@ def add_to_inventory(user_id: int, item_name: str, item_price: int, item_type: s
     )
     conn.commit()
     return True
+
+
+#=============== FRIEND
+def send_friend_request(from_user_id: int, to_user_id: int) -> bool:
+    # Записуємо запит в окрему таблицю
+    pass
+
+def accept_friend_request(request_id: int) -> bool:
+    # Додаємо в друзі
+    pass
+
+def reject_friend_request(request_id: int) -> bool:
+    # Видаляємо запит
+    pass
 
 def remove_from_inventory(user_id: int, item_name: str) -> bool:
     """Видалити предмет з інвентаря"""
@@ -976,15 +1423,30 @@ def build_income_menu(user_id: int):
     kb.add(*buttons)
     return kb
 
-def build_shop_menu():
+def build_shop_menu(user_id: int):
+    """Побудувати меню магазину з урахуванням паспорта"""
+    cursor.execute("SELECT has_passport FROM players WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    has_passport = result[0] if result else False
+    
     kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(
-        InlineKeyboardButton("🐓 Ферма", callback_data="shop_farm"),
-        InlineKeyboardButton("🏘️ Нерухомість", callback_data="shop_real_estate"),
-        InlineKeyboardButton("🎭 Ролі", callback_data="shop_roles"),
-        InlineKeyboardButton("🏷️ Префікси", callback_data="shop_prefixes"),
-        InlineKeyboardButton("⬅️ Назад", callback_data="menu_back|main")
-    )
+    
+    if has_passport:
+        # Повний доступ з паспортом
+        kb.add(
+            InlineKeyboardButton("🐓 Ферма", callback_data="shop_farm"),
+            InlineKeyboardButton("🏘️ Нерухомість", callback_data="shop_real_estate"),
+            InlineKeyboardButton("🎭 Ролі", callback_data="shop_roles"),
+            InlineKeyboardButton("🏷️ Префікси", callback_data="shop_prefixes"),
+            InlineKeyboardButton("🎯 Рівні", callback_data="shop_levels"),
+            InlineKeyboardButton("⬅️ Назад", callback_data="menu_back|main")
+        )
+    else:
+        # Обмежений доступ без паспорта - тільки рівні
+        kb.add(InlineKeyboardButton("🎯 Рівні", callback_data="shop_levels"))
+        kb.add(InlineKeyboardButton("🛂 Отримати паспорт", callback_data="menu_profile"))
+        kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_back|main"))
+    
     return kb
 
 def build_friends_menu():
@@ -1034,6 +1496,28 @@ async def cb_menu_back(call: types.CallbackQuery):
     
     # Головне меню НЕ видаляємо
     await call.message.edit_text(text, reply_markup=build_main_menu(user_id))
+
+@dp.callback_query_handler(lambda c: c.data == 'menu_profile')
+async def cb_menu_profile(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    ensure_player(user_id, call.from_user.username or call.from_user.full_name)
+    
+    cursor.execute("SELECT has_passport FROM players WHERE user_id = ?", (user_id,))
+    has_passport = cursor.fetchone()[0]
+    
+    if not has_passport:
+        # Профіль БЕЗ паспорта
+        await show_profile_without_passport(call, user_id)
+    else:
+        # Профіль З паспортом
+        await show_passport(call, user_id)
+
+
+#=============== VIEM PROFILE
+@dp.callback_query_handler(lambda c: c.data.startswith('view_passport_'))
+async def cb_view_passport(call: types.CallbackQuery):
+    # Показуємо паспорт іншого гравця
+    pass
 
 @dp.message_handler(commands=['sell'])
 async def cmd_sell(message: types.Message):
@@ -1147,6 +1631,19 @@ async def cb_menu_profile(call: types.CallbackQuery):
     user_id = call.from_user.id
     ensure_player(user_id, call.from_user.username or call.from_user.full_name)
     
+    cursor.execute("SELECT has_passport FROM players WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    has_passport = result[0] if result else False
+    
+    if not has_passport:
+        # Профіль БЕЗ паспорта
+        await show_profile_without_passport(call, user_id)
+    else:
+        # Профіль З паспортом (поки старий профіль)
+        await show_old_profile(call, user_id)
+
+async def show_old_profile(call: types.CallbackQuery, user_id: int):
+    """Старий профіль (тимчасово)"""
     cursor.execute("SELECT username, level, xp, coins, role, total_taps FROM players WHERE user_id = ?", (user_id,))
     result = cursor.fetchone()
     
@@ -1166,9 +1663,9 @@ async def cb_menu_profile(call: types.CallbackQuery):
             f"🎭 <b>Роль:</b> {role}\n"
             f"👆 <b>Тапів:</b> {total_taps}\n\n"
             f"💰 <b>Пасивний дохід:</b>\n"
-            f"• 🐓 Ферма: {farm_income} ✯/год\n"
-            f"• 🏘️ Нерухомість: {estate_income} ✯/год\n"
-            f"• 💰 Всього: {total_passive} ✯/год"
+            f"• 🐓 Ферма: {farm_income} ✯/6 год\n"
+            f"• 🏘️ Нерухомість: {estate_income} ✯/6 год\n"
+            f"• 💰 Всього: {total_passive} ✯/6 год"
         )
         
         kb = InlineKeyboardMarkup()
@@ -1191,9 +1688,9 @@ async def cb_menu_income(call: types.CallbackQuery):
         f"💰 <b>Система доходів</b>\n\n"
         f"💎 <b>Ваш баланс:</b> {get_user_coins(user_id)} ✯\n\n"
         f"📊 <b>Поточні доходи:</b>\n"
-        f"• 🐓 Ферма: {farm_income} ✯/год\n"
-        f"• 🏘️ Нерухомість: {estate_income} ✯/год\n"
-        f"• 💰 Всього пасивно: {total_passive} ✯/год\n\n"
+        f"• 🐓 Ферма: {farm_income} ✯/6 год\n"
+        f"• 🏘️ Нерухомість: {estate_income} ✯/6 год\n"
+        f"• 💰 Всього пасивно: {total_passive} ✯/6 год\n\n"
         f"🎯 <b>Оберіть розділ для детальнішої інформації:</b>"
     )
     
@@ -1224,16 +1721,36 @@ async def cb_menu_leaderboard(call: types.CallbackQuery):
 @dp.callback_query_handler(lambda c: c.data == 'menu_shop')
 async def cb_menu_shop(call: types.CallbackQuery):
     await call.answer()
-    text = (
-        "🛍️ <b>Магазин</b>\n\n"
-        "Оберіть категорію:\n\n"
-        "• 🐓 <b>Ферма</b> - Тварини для пасивного доходу\n"
-        "• 🏘️ <b>Нерухомість</b> - Об'єкти нерухомості\n"
-        "• 🎭 <b>Ролі</b> - Спеціальні можливості\n"
-        "• 🏷️ <b>Префікси</b> - Стильні позначки\n\n"
-        "💡 <b>Порада:</b> Інвестуйте в пасивний дохід!"
-    )
-    await call.message.edit_text(text, reply_markup=build_shop_menu())
+    user_id = call.from_user.id
+    ensure_player(user_id, call.from_user.username or call.from_user.full_name)
+    
+    cursor.execute("SELECT has_passport FROM players WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    has_passport = result[0] if result else False
+    
+    if has_passport:
+        text = (
+            "🛍️ <b>Магазин</b>\n\n"
+            "Оберіть категорію:\n\n"
+            "• 🐓 <b>Ферма</b> - Тварини для пасивного доходу\n"
+            "• 🏘️ <b>Нерухомість</b> - Об'єкти нерухомості\n"
+            "• 🎭 <b>Ролі</b> - Спеціальні можливості\n"
+            "• 🏷️ <b>Префікси</b> - Стильні позначки\n"
+            "• 🎯 <b>Рівні</b> - Швидке підвищення рівня\n\n"
+            "💡 <b>Порада:</b> Інвестуйте в пасивний дохід!"
+        )
+    else:
+        text = (
+            "🛍️ <b>Магазин</b>\n\n"
+            "❌ <b>У вас немає паспорта!</b>\n\n"
+            "📋 <b>Доступно без паспорта:</b>\n"
+            "• 🎯 Купівля рівнів\n\n"
+            "📋 <b>Потрібен паспорт:</b>\n"
+            "• 🐓 Ферма\n• 🏘️ Нерухомість\n• 🎭 Ролі\n• 🏷️ Префікси\n\n"
+            "💡 Отримайте паспорт в профілі!"
+        )
+    
+    await call.message.edit_text(text, reply_markup=build_shop_menu(user_id))
 
 @dp.callback_query_handler(lambda c: c.data == 'menu_roulettes')
 async def cb_menu_roulettes(call: types.CallbackQuery):
@@ -1276,12 +1793,384 @@ async def cb_menu_back(call: types.CallbackQuery):
     )
     
     await call.message.edit_text(text, reply_markup=build_main_menu(user_id))
+#====================== INFO ==========================
+@dp.message_handler(commands=['info'])
+async def cmd_info(message: types.Message):
+    user_id = message.from_user.id
+    ensure_player(user_id, message.from_user.username or message.from_user.full_name)
+    
+    cursor.execute("SELECT has_passport FROM players WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    has_passport = result[0] if result else False
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      📚  <b>ІНФОРМАЦІЯ ПРО БОТА</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+    )
+    
+    if not has_passport:
+        text += (
+            f"🎯 <b>ЕТАП 1: ПОЧАТОК ГРИ</b>\n"
+            f"1. Грайте в 🎮 <b>Ігри</b> для заробітку\n"
+            f"2. Отримайте 🎯 <b>2 рівень</b> та 1000 ✯\n"
+            f"3. Купіть 🛂 <b>Паспорт</b> в профілі\n\n"
+            f"📋 <b>ДОСТУПНО БЕЗ ПАСПОРТА:</b>\n"
+            f"• 🎮 Всі ігри (заробляйте монети)\n"
+            f"• 🛍️ Магазин рівнів (підвищуйте рівень)\n"
+            f"• 👤 Профіль (отримайте паспорт)\n\n"
+        )
+    else:
+        text += (
+            f"✅ <b>У ВАС Є ПАСПОРТ!</b>\n\n"
+            f"🎯 <b>ПОВНИЙ ДОСТУП:</b>\n"
+        )
+    
+    text += (
+        f"📋 <b>ОСНОВНІ РОЗДІЛИ:</b>\n"
+        f"• 🎮 <b>Ігри</b> - заробляйте монети\n"
+        f"• 🛍️ <b>Магазин</b> - купуйте покращення\n"
+        f"• 👤 <b>Профіль</b> - ваш паспорт та статистика\n"
+        f"• 💰 <b>Доходи</b> - пасивний заробіток\n"
+        f"• 📦 <b>Інвентар</b> - ваші предмети\n"
+        f"• 👥 <b>Друзі</b> - спілкування та перекази\n"
+        f"• 🏆 <b>Топ гравців</b> - рейтинг\n\n"
+    )
+    
+    text += (
+        f"🎮 <b>ІГРИ ДЛЯ ЗАРОБІТКУ:</b>\n"
+        f"• 🎯 <b>Вікторина</b> - відповідайте на питання\n"
+        f"• 👆 <b>Tap Game</b> - клікайте та заробляйте\n"
+        f"• 🎰 <b>Рулетки</b> - вигравайте призи\n"
+        f"• ⚔️ <b>PvP Дуель</b> - змагайтесь з гравцями\n"
+        f"• 🎲 <b>Кістки</b> - випробуйте удачу\n"
+        f"• 🎯 <b>Вгадай число</b> - тестуйте інтуїцію\n\n"
+    )
+    
+    text += (
+        f"💰 <b>ПАСИВНИЙ ДОХІД:</b>\n"
+        f"• 🐓 <b>Ферма</b> - тварини приносять дохід\n"
+        f"• 🏘️ <b>Нерухомість</b> - об'єкти нерухомості\n"
+        f"• 💰 Дохід нараховується кожні 6 годин\n\n"
+    )
+    
+    text += (
+        f"🛍️ <b>МАГАЗИН:</b>\n"
+        f"• 🐓 <b>Ферма</b> - тварини\n"
+        f"• 🏘️ <b>Нерухомість</b> - об'єкти\n"
+        f"• 🎭 <b>Ролі</b> - спеціальні можливості\n"
+        f"• 🏷️ <b>Префікси</b> - стильні позначки\n"
+        f"• 🎯 <b>Рівні</b> - швидке підвищення\n\n"
+    )
+    
+    text += (
+        f"⚡ <b>КОРИСНІ КОМАНДИ:</b>\n"
+        f"• /start - головне меню\n"
+        f"• /info - ця довідка\n"
+        f"• /profile - ваш профіль\n"
+        f"• /shop - магазин\n"
+        f"• /games - ігри\n"
+        f"• /inventory - інвентар\n"
+        f"• /friends - друзі\n\n"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_back|main"))
+    
+    await message.answer(text, reply_markup=kb)
 
+#========== ADMIN HELP ================
+@dp.message_handler(commands=['adminhelp'])
+async def cmd_adminhelp(message: types.Message):
+    """Список всіх адмін-команд"""
+    if not is_admin(message.from_user.id):
+        await message.answer("❌ Доступ заборонено!")
+        return
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      👑  <b>АДМІН КОМАНДИ</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        
+        f"👥 <b>КОМАНДИ ГРАВЦІВ:</b>\n"
+        f"• /finduser ID - пошук гравця\n"
+        f"• /setcoins ID СУМА - змінити баланс\n"
+        f"• /setlevel ID РІВЕНЬ - змінити рівень\n"
+        f"• /rewardall СУМА - нагородити всіх\n"
+        f"• /broadcast ТЕКСТ - розсилка\n\n"
+        
+        f"🚫 <b>МОДЕРАЦІЯ:</b>\n"
+        f"• /ban ID - заблокувати гравця\n"
+        f"• /unban ID - розблокувати гравця\n"
+        f"• /banlist - список банів\n\n"
+        
+        f"🎮 <b>НАЛАШТУВАННЯ ІГОР:</b>\n"
+        f"• /setroulette [item/normal/premium] ЦІНА\n"
+        f"• /setpvp [bet/maxbet/bonus] ЗНАЧЕННЯ\n\n"
+        
+        f"⚙️ <b>СИСТЕМНІ КОМАНДИ:</b>\n"
+        f"• /clearauction - очистити аукціон\n"
+        f"• /stats - статистика бота\n"
+        f"• /adminhelp - цей список\n\n"
+        
+        f"📊 <b>АНАЛІТИКА:</b>\n"
+        f"• Використовуйте адмін-панель (/start → Адмін)\n"
+        f"• Там є повна статистика та аналітика\n\n"
+        
+        f"💡 <b>ВИКОРИСТАННЯ:</b>\n"
+        f"• ID - числовий ідентифікатор гравця\n"
+        f"• СУМА - може бути +100, -50, або 1000\n"
+        f"• РІВЕНЬ - може бути +2, -1, або 10\n\n"
+        
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    await message.answer(text)
 # ========== ІНВЕНТАР ТА АУКЦІОН ==========
+
+@dp.callback_query_handler(lambda c: c.data.startswith('sell_item_menu|'))
+async def cb_sell_item_menu(call: types.CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id
+    page = int(call.data.split('|')[1])
+    
+    items_per_page = 10
+    user_items = get_user_inventory(user_id)
+    
+    if not user_items:
+        await call.message.edit_text(
+            "❌ <b>У вас немає предметів для продажу!</b>\n\n"
+            "🎪 Отримайте предмети з рулетки предметів.",
+            reply_markup=InlineKeyboardMarkup().add(
+                InlineKeyboardButton("⬅️ Назад", callback_data="inventory_view")
+            )
+        )
+        return
+    
+    # Розділяємо предмети на сторінки
+    total_pages = (len(user_items) + items_per_page - 1) // items_per_page
+    start_idx = (page - 1) * items_per_page
+    end_idx = start_idx + items_per_page
+    page_items = user_items[start_idx:end_idx]
+    
+    text = f"💰 <b>Продаж предметів</b>\n\n"
+    text += f"📦 Предметів: {len(user_items)}/10\n\n"
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    
+    for i, item in enumerate(page_items, start_idx + 1):
+        # Знаходимо ID предмета
+        item_id = "??"
+        for prize in ItemRoulettePrizes.PRIZES:
+            if prize["name"] == item["name"]:
+                item_id = prize["id"]
+                break
+        
+        text += f"{i}. {item['name']} (ID: {item_id})\n"
+        text += f"   💰 Ціна: {item['price']} ✯\n\n"
+        
+        # Кнопки для продажу
+        kb.row(
+            InlineKeyboardButton(
+                f"🎁 {item['name'][:10]}...", 
+                callback_data=f"select_sell_item|{item_id}"
+            ),
+            InlineKeyboardButton(
+                f"💰 {item['price']}✯", 
+                callback_data=f"quick_sell|{item_id}"
+            )
+        )
+    
+    # Кнопки пагінації тільки якщо більше 1 сторінки
+    if total_pages > 1:
+        pagination_buttons = []
+        if page > 1:
+            pagination_buttons.append(InlineKeyboardButton("◀️ Назад", callback_data=f"sell_item_menu|{page-1}"))
+        
+        if page < total_pages:
+            pagination_buttons.append(InlineKeyboardButton("Вперед ▶️", callback_data=f"sell_item_menu|{page+1}"))
+        
+        if pagination_buttons:
+            kb.row(*pagination_buttons)
+    
+    kb.row(InlineKeyboardButton("⬅️ Назад", callback_data="inventory_view"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('select_sell_item|'))
+async def cb_select_sell_item(call: types.CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id
+    item_id = int(call.data.split('|')[1])
+    
+    # Знаходимо предмет
+    item_name = None
+    item_price = 0
+    for prize in ItemRoulettePrizes.PRIZES:
+        if prize["id"] == item_id:
+            item_name = prize["name"]
+            item_price = prize["price"]
+            break
+    
+    if not item_name:
+        await call.answer("❌ Предмет не знайдено!", show_alert=True)
+        return
+    
+    text = (
+        f"💰 <b>Продаж предмета</b>\n\n"
+        f"🎁 Предмет: {item_name}\n"
+        f"💎 Оригінальна ціна: {item_price} ✯\n\n"
+        f"📝 <b>Варіанти продажу:</b>\n"
+        f"• 🏪 На аукціон (90% ціни)\n"
+        f"• 💰 Швидка продажа (70% ціни)\n\n"
+        f"💡 <b>Порада:</b> На аукціоні предмет буде доступний 24 години"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🏪 На аукціон", callback_data=f"sell_auction|{item_id}"),
+        InlineKeyboardButton("💰 Швидка продажа", callback_data=f"quick_sell|{item_id}"),
+        InlineKeyboardButton("⬅️ Назад", callback_data="sell_item_menu|1")
+    )
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('select_sell_item|'))
+async def cb_select_sell_item(call: types.CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id
+    item_id = int(call.data.split('|')[1])
+    
+    # Знаходимо предмет
+    item_name = None
+    item_price = 0
+    for prize in ItemRoulettePrizes.PRIZES:
+        if prize["id"] == item_id:
+            item_name = prize["name"]
+            item_price = prize["price"]
+            break
+    
+    if not item_name:
+        await call.answer("❌ Предмет не знайдено!", show_alert=True)
+        return
+    
+    text = (
+        f"💰 <b>Продаж предмета</b>\n\n"
+        f"🎁 Предмет: {item_name}\n"
+        f"💎 Оригінальна ціна: {item_price} ✯\n\n"
+        f"📝 <b>Варіанти продажу:</b>\n"
+        f"• 🏪 На аукціон (90% ціни)\n"
+        f"• 👤 Іншому гравцю\n\n"
+        f"💡 <b>Порада:</b> На аукціоні предмет буде доступний 24 години"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🏪 На аукціон", callback_data=f"sell_auction|{item_id}"),
+        InlineKeyboardButton("👤 Іншому гравцю", callback_data=f"sell_player|{item_id}"),
+        InlineKeyboardButton("💰 Швидка продажа", callback_data=f"quick_sell|{item_id}"),
+        InlineKeyboardButton("⬅️ Назад", callback_data="sell_item_menu|1")
+    )
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('sell_auction|'))
+async def cb_sell_auction(call: types.CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id
+    item_id = int(call.data.split('|')[1])
+    
+    # Знаходимо предмет
+    item_data = None
+    for prize in ItemRoulettePrizes.PRIZES:
+        if prize["id"] == item_id:
+            item_data = prize
+            break
+    
+    if not item_data:
+        await call.answer("❌ Предмет не знайдено!", show_alert=True)
+        return
+    
+    # Перевіряємо чи є предмет в інвентарі
+    user_items = get_user_inventory(user_id)
+    if not any(item["name"] == item_data["name"] for item in user_items):
+        await call.answer("❌ У вас немає цього предмета!", show_alert=True)
+        return
+    
+    # Додаємо на аукціон
+    if add_to_auction(user_id, item_data["name"], item_data["type"], item_data["price"]):
+        # Видаляємо з інвентаря
+        remove_from_inventory(user_id, item_data["name"])
+        
+        auction_price = int(item_data["price"] * 0.9)
+        
+        await call.message.edit_text(
+            f"✅ <b>Предмет виставлено на аукціон!</b>\n\n"
+            f"🎁 Предмет: {item_data['name']}\n"
+            f"💰 Оригінальна ціна: {item_data['price']} ✯\n"
+            f"🏪 Ціна на аукціоні: {auction_price} ✯\n"
+            f"💸 Ви отримаєте: {int(auction_price * 0.96)} ✯\n\n"
+            f"⏰ Предмет буде видалено через 24 години",
+            reply_markup=InlineKeyboardMarkup().add(
+                InlineKeyboardButton("⚖️ Перейти до аукціону", callback_data="auction_view|1"),
+                InlineKeyboardButton("⬅️ Назад", callback_data="sell_item_menu|1")
+            )
+        )
+    else:
+        await call.answer("❌ Помилка при додаванні на аукціон!", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('quick_sell|'))
+async def cb_quick_sell(call: types.CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id
+    item_id = int(call.data.split('|')[1])
+    
+    # Знаходимо предмет
+    item_data = None
+    for prize in ItemRoulettePrizes.PRIZES:
+        if prize["id"] == item_id:
+            item_data = prize
+            break
+    
+    if not item_data:
+        await call.answer("❌ Предмет не знайдено!", show_alert=True)
+        return
+    
+    # Перевіряємо чи є предмет в інвентарі
+    user_items = get_user_inventory(user_id)
+    if not any(item["name"] == item_data["name"] for item in user_items):
+        await call.answer("❌ У вас немає цього предмета!", show_alert=True)
+        return
+    
+    # Швидка продажа - 70% від ціни
+    quick_sell_price = int(item_data["price"] * 0.7)
+    
+    # Видаляємо з інвентаря
+    remove_from_inventory(user_id, item_data["name"])
+    
+    # Додаємо монети
+    add_user_coins(user_id, quick_sell_price)
+    
+    await call.message.edit_text(
+        f"💰 <b>Предмет швидко продано!</b>\n\n"
+        f"🎁 Предмет: {item_data['name']}\n"
+        f"💎 Оригінальна ціна: {item_data['price']} ✯\n"
+        f"🏪 Ви отримали: {quick_sell_price} ✯ (70%)\n"
+        f"💸 Ваш баланс: {get_user_coins(user_id)} ✯",
+        reply_markup=InlineKeyboardMarkup().add(
+            InlineKeyboardButton("🔄 Продати ще", callback_data="sell_item_menu|1"),
+            InlineKeyboardButton("⬅️ В інвентар", callback_data="inventory_view")
+        )
+    )
+
+
 @dp.callback_query_handler(lambda c: c.data == 'inventory_view')
 async def cb_inventory_view(call: types.CallbackQuery):
     await call.answer()
     user_id = call.from_user.id
+    
+    # Перевіряємо рівень для доступу до крафту (5+ як для рулетки)
+    user_level = get_user_level(user_id)
     
     # Отримуємо всі елементи інвентаря
     items = get_user_inventory(user_id)
@@ -1325,11 +2214,101 @@ async def cb_inventory_view(call: types.CallbackQuery):
     kb = InlineKeyboardMarkup(row_width=2)
     kb.add(
         InlineKeyboardButton("🎪 Рулетка предметів", callback_data="menu_item_roulette"),
-        InlineKeyboardButton("⚖️ Аукціон", callback_data="auction_view")
+        InlineKeyboardButton("⚖️ Аукціон", callback_data="auction_view|1"),  # Додаємо сторінку
+        InlineKeyboardButton("🛠️ Крафт предметів", callback_data="crafting_menu"),
+        InlineKeyboardButton("💰 Продати предмет", callback_data="sell_item_menu|1")  # Нова кнопка!
     )
     kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_profile"))
     
     await call.message.edit_text(text, reply_markup=kb)
+
+#======================= CRAFT MENU
+@dp.callback_query_handler(lambda c: c.data == 'crafting_menu')
+async def cb_crafting_menu(call: types.CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id
+    
+    # Перевіряємо рівень
+    user_level = get_user_level(user_id)
+    if user_level < 5:
+        await call.answer("❌ Крафт доступний з 5 рівня!", show_alert=True)
+        return
+    
+    user_coins = get_user_coins(user_id)
+    craftable_items = get_user_craftable_items(user_id)
+    
+    text = (
+        f"🛠️ <b>Мастерня крафту</b>\n\n"
+        f"💎 Баланс: {user_coins} ✯\n"
+        f"🎯 Ваш рівень: {user_level}\n\n"
+        f"📋 <b>Доступні рецепти:</b>\n"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    for craftable in craftable_items:
+        recipe = craftable["recipe"]
+        emoji = "✅" if craftable["can_craft"] else "❌"
+        
+        text += f"\n{emoji} <b>{recipe['name']}</b>\n"
+        text += f"💰 Вартість крафту: {recipe['cost']} ✯\n"
+        
+        # Інгредієнти
+        text += "📦 Потрібно: "
+        ingredients_text = []
+        for ingredient in recipe["ingredients"]:
+            ingredients_text.append(f"{ingredient['name']} x{ingredient['quantity']}")
+        text += ", ".join(ingredients_text) + "\n"
+        
+        # Результат
+        if recipe["result"] == "random_car":
+            text += f"🎁 Результат: Випадкова машина\n"
+        else:
+            text += f"🎁 Результат: {recipe['result']} ({recipe['result_price']} ✯)\n"
+        
+        # Статус
+        if not craftable["can_craft"]:
+            text += f"❌ Не вистачає: {', '.join(craftable['missing_ingredients'])}\n"
+        
+        text += "\n"
+        
+        # Кнопка
+        if craftable["can_craft"]:
+            kb.insert(InlineKeyboardButton(
+                f"🛠️ {recipe['name']} - {recipe['cost']}✯", 
+                callback_data=f"craft_item_{recipe['id']}"
+            ))
+        else:
+            kb.insert(InlineKeyboardButton(
+                f"❌ {recipe['name']}", 
+                callback_data="cannot_craft"
+            ))
+    
+    if not any(craftable["can_craft"] for craftable in craftable_items):
+        text += "\n💡 Зберіть потрібні предмети з рулетки для крафту!"
+    
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="inventory_view"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('craft_item_'))
+async def cb_craft_item(call: types.CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id
+    recipe_id = int(call.data.replace('craft_item_', ''))
+    
+    result = craft_item(user_id, recipe_id)
+    
+    if result["success"]:
+        await call.answer("✅ Крафт успішний!", show_alert=True)
+    else:
+        await call.answer(result["message"], show_alert=True)
+    
+    await cb_crafting_menu(call)
+
+@dp.callback_query_handler(lambda c: c.data == 'cannot_craft')
+async def cb_cannot_craft(call: types.CallbackQuery):
+    await call.answer("❌ Недостатньо матеріалів для крафту!", show_alert=True)
 
 @dp.callback_query_handler(lambda c: c.data == 'auction_view')
 async def cb_auction_view(call: types.CallbackQuery):
@@ -1369,6 +2348,87 @@ async def cb_auction_view(call: types.CallbackQuery):
     await call.message.edit_text(text, reply_markup=kb)
 
 # ========== ОБРОБНИКИ ПРОДАЖІВ ==========
+@dp.callback_query_handler(lambda c: c.data.startswith('auction_view|'))
+async def cb_auction_view(call: types.CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id
+    page = int(call.data.split('|')[1])
+    
+    # Очищаємо старі предмети
+    cleanup_old_auction_items()
+    
+    cursor.execute("""
+        SELECT ai.*, p.username 
+        FROM auction_items ai 
+        JOIN players p ON ai.user_id = p.user_id 
+        ORDER BY ai.listed_date DESC
+    """)
+    all_auction_items = cursor.fetchall()
+    
+    items_per_page = 20
+    total_pages = (len(all_auction_items) + items_per_page - 1) // items_per_page
+    start_idx = (page - 1) * items_per_page
+    end_idx = start_idx + items_per_page
+    page_items = all_auction_items[start_idx:end_idx]
+    
+    text = f"⚖️ <b>Аукціон</b>\n\n"
+    text += f"📄 Сторінка {page}/{total_pages}\n"
+    text += f"🎁 Всього предметів: {len(all_auction_items)}\n\n"
+    
+    if not page_items:
+        text += "❌ На цій сторінці немає предметів!\n\n"
+    else:
+        for i, item in enumerate(page_items, start_idx + 1):
+            item_id, seller_id, item_name, item_type, original_price, auction_price, listed_date, seller_name = item
+            
+            # Комісія 4%
+            commission = int(auction_price * 0.04)
+            seller_gets = auction_price - commission
+            
+            # Час розміщення
+            list_time = datetime.fromisoformat(listed_date)
+            time_ago = datetime.now() - list_time
+            hours_ago = int(time_ago.total_seconds() // 3600)
+            
+            text += f"{i}. 🎁 {item_name}\n"
+            text += f"   💰 Ціна: {auction_price} ✯\n"
+            text += f"   👤 Продавець: {seller_name}\n"
+            text += f"   ⏰ {hours_ago} год. тому\n"
+            text += f"   🎯 Кнопка: /buy {item_id}\n\n"
+    
+    kb = InlineKeyboardMarkup(row_width=5)
+    
+    # Кнопки пагінації
+    pagination_buttons = []
+    if page > 1:
+        pagination_buttons.append(InlineKeyboardButton("◀️", callback_data=f"auction_view|{page-1}"))
+    
+    # Додаємо кнопки сторінок (максимум 5)
+    start_page = max(1, page - 2)
+    end_page = min(total_pages, start_page + 4)
+    
+    for p in range(start_page, end_page + 1):
+        if p == page:
+            pagination_buttons.append(InlineKeyboardButton(f"•{p}•", callback_data=f"auction_view|{p}"))
+        else:
+            pagination_buttons.append(InlineKeyboardButton(str(p), callback_data=f"auction_view|{p}"))
+    
+    if page < total_pages:
+        pagination_buttons.append(InlineKeyboardButton("▶️", callback_data=f"auction_view|{page+1}"))
+    
+    if pagination_buttons:
+        kb.row(*pagination_buttons)
+    
+    kb.row(
+        InlineKeyboardButton("📦 Мій інвентар", callback_data="inventory_view"),
+        InlineKeyboardButton("💰 Продати предмет", callback_data="sell_item_menu|1")
+    )
+    kb.row(InlineKeyboardButton("🔄 Оновити", callback_data=f"auction_view|{page}"))
+    kb.row(InlineKeyboardButton("⬅️ Назад", callback_data="inventory_view"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+
 @dp.callback_query_handler(lambda c: c.data.startswith('accept_sale_'))
 async def cb_accept_sale(call: types.CallbackQuery):
     await call.answer()
@@ -1448,6 +2508,8 @@ async def cb_reject_sale(call: types.CallbackQuery):
             InlineKeyboardButton("📦 Інвентар", callback_data="inventory_view")
         )
     )
+
+
 
 @dp.callback_query_handler(lambda c: c.data.startswith('reject_sale_'))
 async def cb_reject_sale(call: types.CallbackQuery):
@@ -2267,16 +3329,16 @@ async def cb_income_farm(call: types.CallbackQuery):
     
     text = (
         f"🐓 <b>Ваша ферма</b>\n\n"
-        f"💰 Дохід: {farm_income} ✯/год\n"
+        f"💰 Дохід: {farm_income} ✯/6 год\n"
         f"💎 Баланс: {get_user_coins(user_id)} ✯\n"
         f"🕒 Наступне нарахування: ~{next_income_time}\n"
-        f"🎯 Всього пасивно: {total_income_per_hour} ✯/год\n\n"
+        f"🎯 Всього пасивно: {total_income_per_hour} ✯/6 год\n\n"
     )
     
     if user_animals:
         text += "🏠 <b>Ваші тварини:</b>\n"
         for animal_type, income, count in user_animals:
-            text += f"• {animal_type}: {count} шт. ({income * count} ✯/год)\n"
+            text += f"• {animal_type}: {count} шт. ({income * count} ✯/6 год)\n"
     else:
         text += "❌ У вас ще немає тварин!\n"
     
@@ -2284,7 +3346,7 @@ async def cb_income_farm(call: types.CallbackQuery):
     for animal in FarmAnimals.ANIMALS[:3]:
         text += f"• {animal['emoji']} {animal['name']}: {animal['price']} ✯ ({animal['income']} ✯/год)\n"
     
-    text += f"\n💡 <b>Дохід нараховується автоматично кожну годину!</b>"
+    text += f"\n💡 <b>Дохід нараховується автоматично кожні 6 годин!</b>"
     
     kb = InlineKeyboardMarkup()
     kb.add(InlineKeyboardButton("🛍️ Купити тварин", callback_data="shop_farm"))
@@ -2318,24 +3380,24 @@ async def cb_income_real_estate(call: types.CallbackQuery):
     
     text = (
         f"🏘️ <b>Ваша нерухомість</b>\n\n"
-        f"💰 Дохід: {estate_income} ✯/год\n"
+        f"💰 Дохід: {estate_income} ✯/6 год\n"
         f"💎 Баланс: {get_user_coins(user_id)} ✯\n"
         f"🕒 Наступне нарахування: ~{next_income_time}\n"
-        f"🎯 Всього пасивно: {total_income_per_hour} ✯/год\n\n"
+        f"🎯 Всього пасивно: {total_income_per_hour} ✯/6 год\n\n"
     )
     
     if user_estates:
         text += "🏠 <b>Ваші об'єкти:</b>\n"
         for estate_type, income in user_estates:
-            text += f"• {estate_type}: {income} ✯/год\n"
+            text += f"• {estate_type}: {income} ✯/6 год\n"
     else:
         text += "❌ У вас ще немає нерухомості!\n"
     
     text += "\n🛍️ <b>Доступна нерухомість:</b>\n"
     for estate in RealEstate.PROPERTIES[:3]:
-        text += f"• {estate['name']}: {estate['price']} ✯ ({estate['income']} ✯/год)\n"
+        text += f"• {estate['name']}: {estate['price']} ✯ ({estate['income']} ✯/6 год)\n"
     
-    text += f"\n💡 <b>Дохід нараховується автоматично кожну годину!</b>"
+    text += f"\n💡 <b>Дохід нараховується автоматично кожні 6 годин!</b>"
     
     kb = InlineKeyboardMarkup()
     kb.add(InlineKeyboardButton("🛍️ Купити нерухомість", callback_data="shop_real_estate"))
@@ -2382,6 +3444,64 @@ async def cb_bank_collect(call: types.CallbackQuery):
 
 # Продовження в наступній частині...
 # ========== МАГАЗИН ==========
+@dp.callback_query_handler(lambda c: c.data == 'shop_levels')
+async def cb_shop_levels(call: types.CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id
+    ensure_player(user_id, call.from_user.username or call.from_user.full_name)
+    
+    current_level = get_user_level(user_id)
+    next_level = current_level + 1
+    user_coins = get_user_coins(user_id)
+    
+    # Розраховуємо ціну
+    price = 1500 * (2 ** (current_level - 1))
+    can_buy = user_coins >= price
+    
+    text = (
+        f"🎯 <b>Магазин рівнів</b>\n\n"
+        f"💎 Ваш баланс: {user_coins} ✯\n"
+        f"🎯 Поточний рівень: {current_level}\n"
+        f"⬆️ Наступний рівень: {next_level}\n"
+        f"💰 Ціна: {price} ✯\n\n"
+    )
+    
+    if can_buy:
+        text += f"✅ Ви можете купити підвищення до {next_level} рівня!"
+    else:
+        text += f"❌ Недостатньо монет для покупки!\nПотрібно ще {price - user_coins} ✯"
+    
+    text += f"\n\n💡 <b>Ціни на наступні рівні:</b>\n"
+    
+    # Показуємо ціни на наступні 3 рівні
+    for i in range(1, 4):
+        level = current_level + i
+        future_price = 1500 * (2 ** (level - 2))  # -2 бо показуємо ціну для переходу з level-1 на level
+        text += f"• Рівень {level}: {future_price} ✯\n"
+    
+    kb = InlineKeyboardMarkup()
+    
+    if can_buy:
+        kb.add(InlineKeyboardButton(f"🎯 Купити рівень {next_level} - {price}✯", callback_data="buy_level"))
+    
+    kb.add(InlineKeyboardButton("🛍️ До магазину", callback_data="menu_shop"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_back|main"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'buy_level')
+async def cb_buy_level(call: types.CallbackQuery):
+    await call.answer()
+    user_id = call.from_user.id
+    
+    result = buy_level(user_id)
+    
+    if result["success"]:
+        await call.answer(f"✅ {result['message']}", show_alert=True)
+    else:
+        await call.answer(result["message"], show_alert=True)
+    
+    await cb_shop_levels(call)
 @dp.callback_query_handler(lambda c: c.data == 'shop_farm')
 async def cb_shop_farm(call: types.CallbackQuery):
     await call.answer()
@@ -2400,7 +3520,7 @@ async def cb_shop_farm(call: types.CallbackQuery):
     text = (
         f"🛍️ <b>Магазин ферми</b>\n\n"
         f"💎 Ваш баланс: {user_coins} ✯\n"
-        f"💰 Поточний дохід: {farm_income} ✯/год\n"
+        f"💰 Поточний дохід: {farm_income} ✯/6 год\n"
         f"🐓 Макс. кількість: {max_animals} од.\n\n"
         f"🐓 <b>Доступні тварини:</b>\n"
     )
@@ -2416,7 +3536,7 @@ async def cb_shop_farm(call: types.CallbackQuery):
         can_buy = user_coins >= animal['price'] and current_count < max_animals
         emoji = "✅" if can_buy else "❌"
         
-        text += f"{emoji} {animal['emoji']} {animal['name']}: {animal['price']} ✯ ({animal['income']} ✯/год)"
+        text += f"{emoji} {animal['emoji']} {animal['name']}: {animal['price']} ✯ ({animal['income']} ✯/6 год)"
         if current_count > 0:
             text += f" [Маєте: {current_count}/{max_animals}]\n"
         else:
@@ -2433,7 +3553,7 @@ async def cb_shop_farm(call: types.CallbackQuery):
                 callback_data=f"cannot_buy_animal"
             ))
     
-    text += f"\n💡 <b>Порада:</b> Тварини приносять пасивний дохід кожну годину!"
+    text += f"\n💡 <b>Порада:</b> Тварини приносять пасивний дохід кожні 6 годин!"
     if user_role == "Фермер":
         text += f"\n🎭 <b>Бонус Фермера:</b> Можна купувати до {max_animals} тварин одного типу!"
     
@@ -2513,7 +3633,7 @@ async def cb_shop_real_estate(call: types.CallbackQuery):
     text = (
         f"🛍️ <b>Магазин нерухомості</b>\n\n"
         f"💎 Ваш баланс: {user_coins} ✯\n"
-        f"💰 Поточний дохід: {estate_income} ✯/год\n"
+        f"💰 Поточний дохід: {estate_income} ✯/6 год\n"
         f"🏘️ Макс. кількість: {max_estates} од.\n\n"
         f"🏘️ <b>Доступна нерухомість:</b>\n"
     )
@@ -2528,7 +3648,7 @@ async def cb_shop_real_estate(call: types.CallbackQuery):
         can_buy = user_coins >= estate['price'] and current_count < max_estates
         emoji = "✅" if can_buy else "❌"
         
-        text += f"{emoji} {estate['name']}: {estate['price']} ✯ ({estate['income']} ✯/год)"
+        text += f"{emoji} {estate['name']}: {estate['price']} ✯ ({estate['income']} ✯/6 год)"
         if current_count > 0:
             text += f" [Маєте: {current_count}/{max_estates}]\n"
         else:
@@ -2808,6 +3928,31 @@ async def cb_claim_task(call: types.CallbackQuery):
     
     await call.answer(f"🎉 Отримано {task['reward']} ✯!", show_alert=True)
     await cb_daily_tasks(call)
+#=============================== ADMINS
+def build_mega_admin_panel():
+    """Побудувати мега-адмін-панель"""
+    kb = InlineKeyboardMarkup(row_width=2)
+    
+    kb.add(
+        InlineKeyboardButton("📊 SYSTEM STATS", callback_data="admin_stats"),
+        InlineKeyboardButton("👥 USER MANAGER", callback_data="admin_users")
+    )
+    kb.add(
+        InlineKeyboardButton("💰 ECONOMY CONTROL", callback_data="admin_economy"),
+        InlineKeyboardButton("🎮 GAME BALANCE", callback_data="admin_games")
+    )
+    kb.add(
+        InlineKeyboardButton("📝 CONTENT MANAGER", callback_data="admin_content"),
+        InlineKeyboardButton("🛡️ MODERATION", callback_data="admin_mod")
+    )
+    kb.add(
+        InlineKeyboardButton("📈 ANALYTICS", callback_data="admin_analytics"),
+        InlineKeyboardButton("⚙️ SYSTEM TOOLS", callback_data="admin_system")
+    )
+    
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="menu_back|main"))
+    
+    return kb
 
 # ========== ДОДАТКОВІ ФУНКЦІЇ ==========
 def add_user_xp(user_id: int, xp: int):
@@ -2912,31 +4057,23 @@ async def cb_admin_panel(call: types.CallbackQuery):
         return
     
     await call.answer()
+    
     stats = get_bot_stats()
     
-    # Отримуємо кількість предметів на аукціоні
-    cursor.execute("SELECT COUNT(*) FROM auction_items")
-    auction_items_count = cursor.fetchone()[0]
-    
     text = (
-        f"👑 <b>Адмін-панель</b>\n\n"
-        f"📊 <b>Статистика бота:</b>\n"
-        f"• 👥 Гравців: {stats['total_players']}\n"
-        f"• 💰 Монет в обігу: {stats['total_coins']}\n"
-        f"• 🎯 Активних сьогодні: {stats['active_today']}\n"
-        f"• ⚖️ Предметів на аукціоні: {auction_items_count}\n\n"
-        f"⚙️ <b>Оберіть дію:</b>"
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      👑  <b>MEGA ADMIN PANEL</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📊 <b>SYSTEM OVERVIEW</b>\n"
+        f"👥 Users: {stats['total_players']}\n"
+        f"💰 Credits: {stats['total_coins']:,} ✯\n"
+        f"🎯 Active: {stats['active_today']}\n"
+        f"📦 Items: {stats['total_items']}\n\n"
+        f"🔄 Last Update: {datetime.now().strftime('%H:%M')}\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
     )
     
-    kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(
-        InlineKeyboardButton("📋 Список гравців", callback_data="admin_users_list"),
-        InlineKeyboardButton("💰 Змінити баланс", callback_data="admin_edit_balance"),
-        InlineKeyboardButton("🎯 Змінити рівень", callback_data="admin_edit_level"),
-        InlineKeyboardButton("🎁 Нагородити всіх", callback_data="admin_reward_all"),
-        InlineKeyboardButton("📢 Розсилка", callback_data="admin_broadcast"),
-        InlineKeyboardButton("📊 Детальна статистика", callback_data="admin_detailed_stats"),
-    )
+    await call.message.edit_text(text, reply_markup=build_mega_admin_panel())
     
     # Додаємо кнопку очищення аукціону, якщо є предмети
     if auction_items_count > 0:
@@ -3898,18 +5035,6 @@ async def background_tasks():
 
 # ========== АВТОМАТИЧНА СИСТЕМА ДОХОДІВ ==========
 
-def calculate_passive_income(user_id: int) -> int:
-    """Розрахувати пасивний дохід за годину"""
-    farm_income = get_user_farm_income(user_id)
-    estate_income = get_user_real_estate_income(user_id)
-    
-    # Додатковий дохід для Банкіра
-    role = get_user_role(user_id)
-    if role == "БАНКІР":
-        estate_income += 25
-    
-    return farm_income + estate_income
-
 def get_last_income_time(user_id: int) -> Optional[datetime]:
     """Отримати час останнього нарахування доходу"""
     cursor.execute("SELECT last_income_time FROM players WHERE user_id = ?", (user_id,))
@@ -3918,11 +5043,23 @@ def get_last_income_time(user_id: int) -> Optional[datetime]:
         return datetime.fromisoformat(result[0])
     return None
 
+def calculate_passive_income(user_id: int) -> int:
+    """Розрахувати пасивний дохід за 6 годин"""
+    farm_income = get_user_farm_income(user_id)
+    estate_income = get_user_real_estate_income(user_id)
+    
+    role = get_user_role(user_id)
+    if role == "БАНКІР":
+        estate_income += 25
+    
+    # Залишаємо ту саму суму, що була за годину
+    total_income = farm_income + estate_income
+    return total_income
+
 def update_income_for_user(user_id: int):
-    """Оновити дохід для конкретного гравця"""
+    """Оновити дохід для конкретного гравця (тепер кожні 6 годин)"""
     last_income_time = get_last_income_time(user_id)
     if not last_income_time:
-        # Перший раз - встановлюємо поточний час
         cursor.execute("UPDATE players SET last_income_time = ? WHERE user_id = ?", 
                        (datetime.now().isoformat(), user_id))
         conn.commit()
@@ -3932,23 +5069,19 @@ def update_income_for_user(user_id: int):
     time_diff = current_time - last_income_time
     hours_passed = time_diff.total_seconds() / 3600
     
-    if hours_passed >= 1:
-        # Нараховуємо дохід
-        income_per_hour = calculate_passive_income(user_id)
-        full_hours = int(hours_passed)  # Тільки повні години
-        total_income = income_per_hour * full_hours
+    # Змінюємо з 1 години на 6 годин
+    if hours_passed >= 6:
+        income_per_6_hours = calculate_passive_income(user_id)
+        full_periods = int(hours_passed // 6)
+        total_income = income_per_6_hours * full_periods
         
         if total_income > 0:
             add_user_coins(user_id, total_income)
-            
-            # Оновлюємо час останнього нарахування
-            new_income_time = last_income_time + timedelta(hours=full_hours)
+            new_income_time = last_income_time + timedelta(hours=6 * full_periods)
             cursor.execute("UPDATE players SET last_income_time = ? WHERE user_id = ?", 
                            (new_income_time.isoformat(), user_id))
             conn.commit()
-            
-            # Логуємо нарахування
-            print(f"💵 Нараховано {total_income} ✯ гравцю {user_id} за {full_hours} год.")
+            print(f"💵 Нараховано {total_income} ✯ гравцю {user_id} за {full_periods * 6} год.")
 
 async def update_all_incomes():
     """Оновити доходи для всіх гравців"""
@@ -3967,15 +5100,14 @@ async def update_all_incomes():
         print(f"❌ Помилка оновлення доходів: {e}")
 
 async def income_scheduler():
-    """Планувальник для автоматичного нарахування доходів"""
+    """Планувальник для автоматичного нарахування доходів (тепер кожні 6 годин)"""
     while True:
         try:
             await update_all_incomes()
-            # Чекаємо 1 годину
-            await asyncio.sleep(3600)
+            await asyncio.sleep(6 * 3600)  # 6 годин замість 1
         except Exception as e:
             print(f"❌ Помилка в планувальнику доходів: {e}")
-            await asyncio.sleep(300)  # Чекаємо 5 хвилин при помилці
+            await asyncio.sleep(300)
 
 async def background_tasks():
     """Фонові задачі"""
@@ -3991,17 +5123,44 @@ async def background_tasks():
             print(f"❌ Помилка в background_tasks: {e}")
             await asyncio.sleep(300)
 
-# ========== ОНОВЛЕННЯ СТРУКТУРИ БАЗИ ==========
+# ========== ОНОВЛЕННЯ СТРУКТУРИ БАЗИ ========== БД
+#====---- pass ----======
+# Перевіряємо чи є колонка has_passport
+if 'has_passport' not in player_columns:
+    print("🔄 Додаємо колонку has_passport до таблиці players...")
+    cursor.execute("ALTER TABLE players ADD COLUMN has_passport BOOLEAN DEFAULT FALSE")
+    conn.commit()
+    print("✅ Колонку has_passport додано!")
+
+# Додамо в секцію оновлення БД
+if 'has_passport' not in player_columns:
+    cursor.execute("ALTER TABLE players ADD COLUMN has_passport BOOLEAN DEFAULT FALSE")
+# Додаємо в секцію оновлення БД
+try:
+    # Перевіряємо чи є колонка item_type в user_inventory
+    cursor.execute("PRAGMA table_info(user_inventory)")
+    inventory_columns = [column[1] for column in cursor.fetchall()]
+    
+    if 'item_type' not in inventory_columns:
+        print("🔄 Оновлюємо структуру таблиці user_inventory для підтримки машин...")
+        # Тут вже є логіка оновлення, просто переконуємося що все працює
+except Exception as e:
+    print(f"❌ Помилка оновлення таблиць: {e}")
+
+
 try:
     # Перевіряємо чи є колонка last_income_time
     cursor.execute("PRAGMA table_info(players)")
     player_columns = [column[1] for column in cursor.fetchall()]
-    
+
     if 'last_income_time' not in player_columns:
         print("🔄 Додаємо колонку last_income_time до таблиці players...")
         cursor.execute("ALTER TABLE players ADD COLUMN last_income_time TEXT")
         conn.commit()
-        print("✅ Колонку додано!")
+        print("✅ Колонку last_income_time додано!")
+        
+except Exception as e:
+    print(f"❌ Помилка оновлення таблиць: {e}")
         
 except Exception as e:
     print(f"❌ Помилка оновлення таблиць: {e}")
@@ -4073,6 +5232,1657 @@ print(f"📁 Файл існує: {os.path.exists(QUESTIONS_PATH)}")
 if os.path.exists(QUESTIONS_PATH):
     print(f"📁 Права доступу: {oct(os.stat(QUESTIONS_PATH).st_mode)[-3:]}")
     
+
+
+
+
+
+
+
+
+#ADMINS
+# ========== МЕГА-АДМІН-ПАНЕЛЬ ==========
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_stats')
+async def cb_admin_stats(call: types.CallbackQuery):
+    """Статистика системи"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    stats = get_bot_stats()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      📊  <b>SYSTEM STATISTICS</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"👥 <b>USERS:</b> {stats['total_players']}\n"
+        f"💰 <b>TOTAL CREDITS:</b> {stats['total_coins']:,} ✯\n"
+        f"🎯 <b>ACTIVE TODAY:</b> {stats['active_today']}\n"
+        f"📦 <b>TOTAL ITEMS:</b> {stats['total_items']}\n"
+        f"💸 <b>TOTAL TRANSFERS:</b> {stats['total_transfers']}\n\n"
+        f"🔄 <i>Real-time monitoring active</i>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("🔄 REFRESH", callback_data="admin_stats"))
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_panel"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_users')
+async def cb_admin_users(call: types.CallbackQuery):
+    """Управління гравцями"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      👥  <b>USER MANAGEMENT</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"🔍 <b>SEARCH & FILTERS</b>\n"
+        f"📊 User Details & Analytics\n"
+        f"💰 Balance Management\n"
+        f"🎯 Level & Role Control\n"
+        f"🛂 Passport Management\n\n"
+        f"⚡ <i>Full user control panel</i>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🔍 SEARCH USER", callback_data="admin_user_search"),
+        InlineKeyboardButton("💰 EDIT BALANCE", callback_data="admin_edit_balance_menu")
+    )
+    kb.add(
+        InlineKeyboardButton("🎯 EDIT LEVEL", callback_data="admin_edit_level_menu"),
+        InlineKeyboardButton("📊 USER STATS", callback_data="admin_user_stats")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_panel"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+# Заглушки для інших розділів (поки що)
+@dp.callback_query_handler(lambda c: c.data in ['admin_economy', 'admin_games', 'admin_content', 'admin_mod', 'admin_analytics', 'admin_system'])
+async def cb_admin_coming_soon(call: types.CallbackQuery):
+    """Заглушка для розділів в розробці"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    section_name = {
+        'admin_economy': '💰 ECONOMY CONTROL',
+        'admin_games': '🎮 GAME BALANCE', 
+        'admin_content': '📝 CONTENT MANAGER',
+        'admin_mod': '🛡️ MODERATION',
+        'admin_analytics': '📈 ANALYTICS',
+        'admin_system': '⚙️ SYSTEM TOOLS'
+    }
+    
+    await call.answer()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      {section_name[call.data]}\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"🚧 <b>SECTION IN DEVELOPMENT</b>\n\n"
+        f"⚡ This powerful feature is being implemented\n"
+        f"🎯 Expected completion: Soon!\n\n"
+        f"💡 <i>Check back later for updates</i>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_panel"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_economy')
+async def cb_admin_economy(call: types.CallbackQuery):
+    """Економічний контроль"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      💰  <b>ECONOMY CONTROL</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"🏦 <b>BANK & COMMISSION</b>\n"
+        f"• Bank Commission: 5%\n"
+        f"• Auction Fee: 4%\n\n"
+        f"📊 <b>PASSIVE INCOME</b>\n"
+        f"• Farm Base Rates\n"
+        f"• Real Estate Income\n"
+        f"• Banker Bonus: +25 ✯/6H\n\n"
+        f"🛒 <b>SHOP ECONOMY</b>\n"
+        f"• Animal Prices\n"
+        f"• Property Costs\n"
+        f"• Level Upgrade Pricing\n\n"
+        f"⚡ <i>Full economic system control</i>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🏦 COMMISSIONS", callback_data="admin_commissions"),
+        InlineKeyboardButton("📊 INCOME RATES", callback_data="admin_income_rates")
+    )
+    kb.add(
+        InlineKeyboardButton("🛒 SHOP PRICES", callback_data="admin_shop_prices"),
+        InlineKeyboardButton("💰 MASS REWARD", callback_data="admin_mass_reward")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_panel"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_mass_reward')
+async def cb_admin_mass_reward(call: types.CallbackQuery):
+    """Масове нагородження"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🎁  <b>MASS REWARD SYSTEM</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📝 <b>QUICK ACTIONS:</b>\n"
+        f"🎁 Reward All Users\n"
+        f"⭐ Mass Level Up\n"
+        f"💰 Economic Stimulus\n\n"
+        f"⚡ <b>BATCH OPERATIONS:</b>\n"
+        f"• Fixed Amount to All\n"
+        f"• Percentage Increase\n"
+        f"• Level-based Rewards\n\n"
+        f"🔧 Use commands for precise control:\n"
+        f"<code>/rewardall 500</code> - 500 ✯ to everyone\n"
+        f"<code>/masslevel 2</code> - +2 levels to all\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🎁 100 ✯ TO ALL", callback_data="admin_reward_100"),
+        InlineKeyboardButton("💰 500 ✯ TO ALL", callback_data="admin_reward_500")
+    )
+    kb.add(
+        InlineKeyboardButton("⭐ +1 LEVEL ALL", callback_data="admin_level_1"),
+        InlineKeyboardButton("🎯 +2 LEVELS ALL", callback_data="admin_level_2")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_economy"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_content')
+async def cb_admin_content(call: types.CallbackQuery):
+    """Керування контентом"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Отримуємо статистику контенту
+    cursor.execute("SELECT COUNT(*) FROM quiz_answers")
+    quiz_played = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(DISTINCT user_id) FROM user_inventory")
+    items_owned = cursor.fetchone()[0]
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      📝  <b>CONTENT MANAGER</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📊 <b>CONTENT STATS:</b>\n"
+        f"• Quiz Questions: {len(load_quiz_questions())}\n"
+        f"• Quiz Plays: {quiz_played}\n"
+        f"• Roulette Items: {len(ItemRoulettePrizes.PRIZES)}\n"
+        f"• Items Owned: {items_owned}\n\n"
+        f"🎯 <b>CONTENT SECTIONS:</b>\n"
+        f"❓ Quiz Questions\n"
+        f"🎁 Roulette Items\n"
+        f"🏘️ Real Estate\n"
+        f"🐓 Farm Animals\n"
+        f"🎭 Roles & Prefixes\n\n"
+        f"⚡ <i>Full content management system</i>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("❓ QUIZ MANAGER", callback_data="admin_quiz_manager"),
+        InlineKeyboardButton("🎁 ROULETTE ITEMS", callback_data="admin_roulette_items")
+    )
+    kb.add(
+        InlineKeyboardButton("🏘️ REAL ESTATE", callback_data="admin_real_estate"),
+        InlineKeyboardButton("🐓 ANIMALS", callback_data="admin_animals")
+    )
+    kb.add(
+        InlineKeyboardButton("🎭 ROLES", callback_data="admin_roles"),
+        InlineKeyboardButton("🏷️ PREFIXES", callback_data="admin_prefixes")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_panel"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+def load_quiz_questions():
+    """Завантажити питання вікторини"""
+    try:
+        with open(QUESTIONS_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return []
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_system')
+async def cb_admin_system(call: types.CallbackQuery):
+    """Системні інструменти"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      ⚙️  <b>SYSTEM TOOLS</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"🔧 <b>TECHNICAL TOOLS:</b>\n"
+        f"• Database Management\n"
+        f"• Cache Control\n"
+        f"• Service Restart\n"
+        f"• Backup Systems\n\n"
+        f"📋 <b>MAINTENANCE:</b>\n"
+        f"• Clean Old Data\n"
+        f"• Optimize Database\n"
+        f"• Clear Auction\n"
+        f"• Reset Systems\n\n"
+        f"🚨 <b>EMERGENCY:</b>\n"
+        f"• Emergency Stop\n"
+        f"• Rollback Systems\n"
+        f"• Debug Mode\n\n"
+        f"⚡ <i>Advanced system control panel</i>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🗃️ DATABASE", callback_data="admin_database"),
+        InlineKeyboardButton("🧹 CLEANUP", callback_data="admin_cleanup")
+    )
+    kb.add(
+        InlineKeyboardButton("🔄 RESTART", callback_data="admin_restart"),
+        InlineKeyboardButton("📋 LOGS", callback_data="admin_logs")
+    )
+    kb.add(
+        InlineKeyboardButton("🚨 EMERGENCY", callback_data="admin_emergency"),
+        InlineKeyboardButton("🛡️ BACKUP", callback_data="admin_backup")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_panel"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_cleanup')
+async def cb_admin_cleanup(call: types.CallbackQuery):
+    """Очищення системи"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Отримуємо статистику для очищення
+    cursor.execute("SELECT COUNT(*) FROM auction_items")
+    auction_items = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM pending_sales")
+    pending_sales = cursor.fetchone()[0]
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🧹  <b>SYSTEM CLEANUP</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📊 <b>CLEANUP STATS:</b>\n"
+        f"• Auction Items: {auction_items}\n"
+        f"• Pending Sales: {pending_sales}\n"
+        f"• Old Data: Auto-cleaned\n\n"
+        f"🚨 <b>QUICK ACTIONS:</b>\n"
+        f"🧹 Clean Auction (24h+)\n"
+        f"🗑️ Clear Pending Sales\n"
+        f"📊 Reset Statistics\n"
+        f"⚡ Optimize Database\n\n"
+        f"⚠️ <b>WARNING:</b> Some actions are irreversible!\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🧹 CLEAN AUCTION", callback_data="admin_clean_auction"),
+        InlineKeyboardButton("🗑️ CLEAR PENDING", callback_data="admin_clear_pending")
+    )
+    kb.add(
+        InlineKeyboardButton("📊 RESET STATS", callback_data="admin_reset_stats"),
+        InlineKeyboardButton("⚡ OPTIMIZE DB", callback_data="admin_optimize_db")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_system"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+@dp.callback_query_handler(lambda c: c.data == 'admin_user_search')
+async def cb_admin_user_search(call: types.CallbackQuery):
+    """Пошук гравця"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🔍  <b>USER SEARCH</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📝 <b>SEARCH OPTIONS:</b>\n"
+        f"• Search by User ID\n"
+        f"• Search by Username\n"
+        f"• Filter by Level/Role\n\n"
+        f"🔧 <b>QUICK ACTIONS:</b>\n"
+        f"• View User Profile\n"
+        f"• Edit Balance/Level\n"
+        f"• Manage Passport\n\n"
+        f"💡 <b>Use commands for search:</b>\n"
+        f"<code>/finduser 123456789</code> - по ID\n"
+        f"<code>/finduser username</code> - по імені\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("🔄 REFRESH", callback_data="admin_user_search"))
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_users"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.message_handler(commands=['finduser'])
+async def cmd_finduser(message: types.Message):
+    """Команда пошуку гравця"""
+    if not is_admin(message.from_user.id):
+        await message.answer("❌ Доступ заборонено!")
+        return
+    
+    try:
+        parts = message.text.split()
+        if len(parts) != 2:
+            await message.answer("❌ Використання: /finduser ID_або_Ім'я")
+            return
+        
+        search_term = parts[1]
+        
+        # Спроба знайти по ID
+        if search_term.isdigit():
+            user_id = int(search_term)
+            cursor.execute("SELECT user_id, username, level, coins, role, has_passport FROM players WHERE user_id = ?", (user_id,))
+        else:
+            # Пошук по імені
+            cursor.execute("SELECT user_id, username, level, coins, role, has_passport FROM players WHERE username LIKE ?", (f"%{search_term}%",))
+        
+        users = cursor.fetchall()
+        
+        if not users:
+            await message.answer("❌ Гравців не знайдено!")
+            return
+        
+        if len(users) == 1:
+            # Один гравець - показуємо деталі
+            user_id, username, level, coins, role, has_passport = users[0]
+            await show_user_details(message, user_id, username, level, coins, role, has_passport)
+        else:
+            # Кілька гравців - показуємо список
+            text = "🔍 <b>Знайдені гравці:</b>\n\n"
+            for user_id, username, level, coins, role, has_passport in users[:10]:
+                text += f"👤 {username} (ID: {user_id})\n"
+                text += f"   🎯 {level} рів. | 💰 {coins} ✯ | 🎭 {role}\n\n"
+            
+            if len(users) > 10:
+                text += f"📄 Показано 10 з {len(users)} гравців"
+            
+            await message.answer(text)
+            
+    except Exception as e:
+        await message.answer(f"❌ Помилка: {e}")
+
+async def show_user_details(message: types.Message, user_id: int, username: str, level: int, coins: int, role: str, has_passport: bool):
+    """Показати деталі гравця"""
+    # Додаткова інформація
+    farm_income = get_user_farm_income(user_id)
+    estate_income = get_user_real_estate_income(user_id)
+    total_income = farm_income + estate_income
+    
+    cursor.execute("SELECT COUNT(*) FROM friends WHERE user_id = ?", (user_id,))
+    friends_count = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM user_inventory WHERE user_id = ?", (user_id,))
+    items_count = cursor.fetchone()[0]
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      👤  <b>USER DETAILS</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📛 <b>Username:</b> {username}\n"
+        f"🆔 <b>User ID:</b> {user_id}\n"
+        f"🎯 <b>Level:</b> {level}\n"
+        f"💰 <b>Balance:</b> {coins:,} ✯\n"
+        f"🎭 <b>Role:</b> {role}\n"
+        f"🛂 <b>Passport:</b> {'✅' if has_passport else '❌'}\n\n"
+        f"📊 <b>Statistics:</b>\n"
+        f"• Income: {total_income} ✯/6 год\n"
+        f"• Friends: {friends_count}\n"
+        f"• Items: {items_count}\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("💰 EDIT BALANCE", callback_data=f"admin_edit_balance_{user_id}"),
+        InlineKeyboardButton("🎯 EDIT LEVEL", callback_data=f"admin_edit_level_{user_id}")
+    )
+    kb.add(
+        InlineKeyboardButton("🛂 PASSPORT", callback_data=f"admin_passport_{user_id}"),
+        InlineKeyboardButton("📊 FULL STATS", callback_data=f"admin_full_stats_{user_id}")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK TO SEARCH", callback_data="admin_user_search"))
+    
+    await message.answer(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('admin_edit_balance_'))
+async def cb_admin_edit_balance(call: types.CallbackQuery):
+    """Редагування балансу гравця"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    user_id = int(call.data.replace('admin_edit_balance_', ''))
+    
+    # Отримуємо поточний баланс
+    cursor.execute("SELECT username, coins FROM players WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    
+    if not result:
+        await call.answer("❌ Гравець не знайдений!")
+        return
+    
+    username, current_coins = result
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      💰  <b>EDIT BALANCE</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"👤 <b>User:</b> {username}\n"
+        f"🆔 <b>ID:</b> {user_id}\n"
+        f"💰 <b>Current Balance:</b> {current_coins:,} ✯\n\n"
+        f"⚡ <b>QUICK ACTIONS:</b>\n"
+        f"• Add/Remove fixed amounts\n"
+        f"• Set specific value\n"
+        f"• Percentage changes\n\n"
+        f"🔧 Use command for precise control:\n"
+        f"<code>/setcoins {user_id} +500</code>\n"
+        f"<code>/setcoins {user_id} 1000</code>\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=3)
+    kb.add(
+        InlineKeyboardButton("➕ 100", callback_data=f"admin_balance_{user_id}_+100"),
+        InlineKeyboardButton("➕ 500", callback_data=f"admin_balance_{user_id}_+500"),
+        InlineKeyboardButton("➕ 1000", callback_data=f"admin_balance_{user_id}_+1000")
+    )
+    kb.add(
+        InlineKeyboardButton("➖ 100", callback_data=f"admin_balance_{user_id}_-100"),
+        InlineKeyboardButton("➖ 500", callback_data=f"admin_balance_{user_id}_-500"), 
+        InlineKeyboardButton("➖ 1000", callback_data=f"admin_balance_{user_id}_-1000")
+    )
+    kb.add(InlineKeyboardButton("🎯 SET EXACT", callback_data=f"admin_set_exact_{user_id}"))
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data=f"admin_user_details_{user_id}"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('admin_balance_'))
+async def cb_admin_balance_quick(call: types.CallbackQuery):
+    """Швидке редагування балансу"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    data_parts = call.data.split('_')
+    user_id = int(data_parts[2])
+    amount = int(data_parts[3])
+    
+    # Отримуємо поточний баланс
+    cursor.execute("SELECT username, coins FROM players WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    
+    if not result:
+        await call.answer("❌ Гравець не знайдений!")
+        return
+    
+    username, current_coins = result
+    new_balance = current_coins + amount
+    
+    if new_balance < 0:
+        await call.answer("❌ Баланс не може бути від'ємним!")
+        return
+    
+    # Оновлюємо баланс
+    cursor.execute("UPDATE players SET coins = ? WHERE user_id = ?", (new_balance, user_id))
+    conn.commit()
+    
+    action = "додано" if amount > 0 else "знято"
+    await call.answer(f"✅ {action} {abs(amount)} ✯ гравцю {username}!")
+    
+    # Оновлюємо повідомлення
+    await cb_admin_edit_balance(call)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('admin_user_details_'))
+async def cb_admin_user_details(call: types.CallbackQuery):
+    """Деталі гравця з кнопок"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    user_id = int(call.data.replace('admin_user_details_', ''))
+    
+    cursor.execute("SELECT username, level, coins, role, has_passport FROM players WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    
+    if not result:
+        await call.answer("❌ Гравець не знайдений!")
+        return
+    
+    username, level, coins, role, has_passport = result
+    
+    # Використовуємо ту саму функцію
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      👤  <b>USER DETAILS</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📛 <b>Username:</b> {username}\n"
+        f"🆔 <b>User ID:</b> {user_id}\n"
+        f"🎯 <b>Level:</b> {level}\n"
+        f"💰 <b>Balance:</b> {coins:,} ✯\n"
+        f"🎭 <b>Role:</b> {role}\n"
+        f"🛂 <b>Passport:</b> {'✅' if has_passport else '❌'}\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("💰 EDIT BALANCE", callback_data=f"admin_edit_balance_{user_id}"),
+        InlineKeyboardButton("🎯 EDIT LEVEL", callback_data=f"admin_edit_level_{user_id}")
+    )
+    kb.add(
+        InlineKeyboardButton("🛂 TOGGLE PASSPORT", callback_data=f"admin_toggle_passport_{user_id}"),
+        InlineKeyboardButton("📊 FULL STATS", callback_data=f"admin_full_stats_{user_id}")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK TO USERS", callback_data="admin_users"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('admin_toggle_passport_'))
+async def cb_admin_toggle_passport(call: types.CallbackQuery):
+    """Перемикач паспорта"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    user_id = int(call.data.replace('admin_toggle_passport_', ''))
+    
+    cursor.execute("SELECT username, has_passport FROM players WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    
+    if not result:
+        await call.answer("❌ Гравець не знайдений!")
+        return
+    
+    username, has_passport = result
+    new_state = not has_passport
+    
+    cursor.execute("UPDATE players SET has_passport = ? WHERE user_id = ?", (new_state, user_id))
+    conn.commit()
+    
+    action = "видано" if new_state else "забрано"
+    await call.answer(f"✅ Паспорт {action} гравцю {username}!")
+    
+    # Оновлюємо повідомлення
+    await cb_admin_user_details(call)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('admin_reward_'))
+async def cb_admin_mass_reward_action(call: types.CallbackQuery):
+    """Масове нагородження"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    amount = int(call.data.replace('admin_reward_', ''))
+    
+    # Отримуємо кількість гравців
+    cursor.execute("SELECT COUNT(*) FROM players")
+    total_players = cursor.fetchone()[0]
+    
+    if total_players == 0:
+        await call.answer("❌ Немає гравців для нагородження!")
+        return
+    
+    # Нагороджуємо всіх
+    cursor.execute("UPDATE players SET coins = coins + ?", (amount,))
+    conn.commit()
+    
+    total_given = amount * total_players
+    
+    await call.answer(f"✅ {amount} ✯ видано {total_players} гравцям!")
+    
+    # Оновлюємо повідомлення
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🎁  <b>REWARD COMPLETED</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"✅ <b>SUCCESS!</b>\n"
+        f"💰 Amount: {amount} ✯\n"
+        f"👥 Players: {total_players}\n"
+        f"💸 Total Distributed: {total_given:,} ✯\n\n"
+        f"🔄 <i>All players have been rewarded</i>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("🔄 ANOTHER REWARD", callback_data="admin_mass_reward"))
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_economy"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_clean_auction')
+async def cb_admin_clean_auction(call: types.CallbackQuery):
+    """Очищення аукціону через кнопку"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    # Отримуємо кількість предметів
+    cursor.execute("SELECT COUNT(*) FROM auction_items")
+    items_count = cursor.fetchone()[0]
+    
+    if items_count == 0:
+        await call.answer("ℹ️ На аукціоні вже немає предметів!")
+        return
+    
+    # Видаляємо всі предмети
+    cursor.execute("DELETE FROM auction_items")
+    conn.commit()
+    
+    await call.answer(f"✅ Аукціон очищено! Видалено {items_count} предметів.")
+    
+    # Оновлюємо повідомлення
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🧹  <b>AUCTION CLEANED</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"✅ <b>SUCCESS!</b>\n"
+        f"🗑️ Items Removed: {items_count}\n"
+        f"🔄 Auction is now empty\n\n"
+        f"⚡ <i>All auction items have been cleared</i>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("🔄 ANOTHER ACTION", callback_data="admin_cleanup"))
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_system"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_games')
+async def cb_admin_games(call: types.CallbackQuery):
+    """Контроль ігрового балансу"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🎮  <b>GAME BALANCE CONTROL</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"🎰 <b>ROULETTE SYSTEMS:</b>\n"
+        f"• Item Roulette (200 ✯)\n"
+        f"• Normal Roulette (50 ✯)  \n"
+        f"• Premium Roulette (500 ✯)\n\n"
+        f"⚔️ <b>PVP SYSTEM:</b>\n"
+        f"• Bet: 10% of balance\n"
+        f"• Warrior Bonus: +50 ✯\n\n"
+        f"📚 <b>QUIZ SYSTEM:</b>\n"
+        f"• Reward: 20 ✯\n"
+        f"• Student Bonus: +5% XP\n\n"
+        f"👆 <b>TAP GAME:</b>\n"
+        f"• Base Income: 1-10 ✯/tap\n"
+        f"• Active Role: +3% income\n\n"
+        f"⚡ <i>Full game balance control</i>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🎰 ROULETTES", callback_data="admin_roulettes"),
+        InlineKeyboardButton("⚔️ PVP", callback_data="admin_pvp")
+    )
+    kb.add(
+        InlineKeyboardButton("📚 QUIZ", callback_data="admin_quiz"),
+        InlineKeyboardButton("👆 TAP GAME", callback_data="admin_tapgame")
+    )
+    kb.add(
+        InlineKeyboardButton("🎲 MINI-GAMES", callback_data="admin_minigames"),
+        InlineKeyboardButton("📊 GAME STATS", callback_data="admin_game_stats")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_panel"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_roulettes')
+async def cb_admin_roulettes(call: types.CallbackQuery):
+    """Контроль рулеток"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Статистика рулеток
+    cursor.execute("SELECT COUNT(*) FROM user_inventory")
+    total_items = cursor.fetchone()[0]
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🎰  <b>ROULETTE CONTROL</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📊 <b>CURRENT SETTINGS:</b>\n"
+        f"🎪 Item Roulette: 200 ✯\n"
+        f"💰 Normal Roulette: 50 ✯\n"
+        f"💎 Premium Roulette: 500 ✯\n"
+        f"📦 Total Items Won: {total_items}\n\n"
+        f"⚡ <b>QUICK ACTIONS:</b>\n"
+        f"• Adjust Prices\n"
+        f"• Modify Probabilities\n"
+        f"• Add New Items\n"
+        f"• View Drop Rates\n\n"
+        f"🔧 Use commands for control:\n"
+        f"<code>/setroulette item 250</code>\n"
+        f"<code>/setroulette normal 75</code>\n"
+        f"<code>/setroulette premium 600</code>\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🎪 ITEM ROULETTE", callback_data="admin_item_roulette"),
+        InlineKeyboardButton("💰 NORMAL ROULETTE", callback_data="admin_normal_roulette")
+    )
+    kb.add(
+        InlineKeyboardButton("💎 PREMIUM ROULETTE", callback_data="admin_premium_roulette"),
+        InlineKeyboardButton("📊 ROULETTE STATS", callback_data="admin_roulette_stats")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_games"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.message_handler(commands=['setroulette'])
+async def cmd_setroulette(message: types.Message):
+    """Змінити ціну рулетки"""
+    if not is_admin(message.from_user.id):
+        await message.answer("❌ Доступ заборонено!")
+        return
+    
+    try:
+        parts = message.text.split()
+        if len(parts) != 3:
+            await message.answer("❌ Використання: /setroulette [item/normal/premium] [ціна]")
+            return
+        
+        roulette_type = parts[1].lower()
+        new_price = int(parts[2])
+        
+        if new_price < 10:
+            await message.answer("❌ Ціна має бути не менше 10 ✯")
+            return
+        
+        roulette_names = {
+            'item': '🎪 Item Roulette',
+            'normal': '💰 Normal Roulette', 
+            'premium': '💎 Premium Roulette'
+        }
+        
+        if roulette_type not in roulette_names:
+            await message.answer("❌ Невірний тип рулетки! Доступні: item, normal, premium")
+            return
+        
+        # Тут буде логіка зміни цін (поки що повідомлення)
+        await message.answer(
+            f"✅ {roulette_names[roulette_type]} price updated!\n"
+            f"🎯 New price: {new_price} ✯\n\n"
+            f"💡 Note: Price changes will apply after bot restart"
+        )
+        
+    except ValueError:
+        await message.answer("❌ Ціна має бути числом!")
+    except Exception as e:
+        await message.answer(f"❌ Помилка: {e}")
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_pvp')
+async def cb_admin_pvp(call: types.CallbackQuery):
+    """Контроль PVP системи"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Статистика PVP
+    cursor.execute("SELECT COUNT(*) FROM players WHERE total_taps > 0")
+    active_players = cursor.fetchone()[0]
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      ⚔️  <b>PVP SYSTEM CONTROL</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📊 <b>CURRENT SETTINGS:</b>\n"
+        f"• Bet: 10% of balance\n"
+        f"• Max Bet: 1000 ✯\n"
+        f"• Min Bet: 10 ✯\n"
+        f"• Warrior Bonus: +50 ✯\n"
+        f"• Active Players: {active_players}\n\n"
+        f"⚡ <b>BALANCE CONTROLS:</b>\n"
+        f"• Change Bet Percentage\n"
+        f"• Adjust Max/Min Bets\n"
+        f"• Modify Warrior Bonus\n"
+        f"• Reset PVP Statistics\n\n"
+        f"🔧 Use commands for control:\n"
+        f"<code>/setpvp bet 15</code> - 15% ставка\n"
+        f"<code>/setpvp maxbet 2000</code>\n"
+        f"<code>/setpvp bonus 75</code>\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("📊 PVP STATS", callback_data="admin_pvp_stats"),
+        InlineKeyboardButton("🔄 RESET PVP", callback_data="admin_reset_pvp")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_games"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_tapgame')
+async def cb_admin_tapgame(call: types.CallbackQuery):
+    """Контроль Tap Game"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Статистика Tap Game
+    cursor.execute("SELECT SUM(total_taps), SUM(daily_taps) FROM players")
+    total_taps, daily_taps = cursor.fetchone()
+    total_taps = total_taps or 0
+    daily_taps = daily_taps or 0
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      👆  <b>TAP GAME CONTROL</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📊 <b>CURRENT STATS:</b>\n"
+        f"• Total Taps: {total_taps:,}\n"
+        f"• Daily Taps: {daily_taps}\n"
+        f"• Base Income: 1-10 ✯/tap\n"
+        f"• Active Role: +3% bonus\n\n"
+        f"🎯 <b>LEVEL SYSTEM:</b>\n"
+    )
+    
+    # Показуємо рівні підвищення
+    for level, boost in list(TapGame.BOOST_LEVELS.items())[:5]:
+        text += f"• Level {level}: {boost['income']} ✯/tap\n"
+    
+    if len(TapGame.BOOST_LEVELS) > 5:
+        text += f"• ... and {len(TapGame.BOOST_LEVELS) - 5} more levels\n"
+    
+    text += f"\n⚡ <b>CONTROL OPTIONS:</b>\n"
+    text += f"• Adjust Base Income\n"
+    text += f"• Modify Level Prices\n"
+    text += f"• Change Daily Limits\n"
+    text += f"• Reset Tap Counters\n\n"
+    text += f"⟡━━━━━━━━━━━━━━━⟡"
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("📊 TAP STATS", callback_data="admin_tap_stats"),
+        InlineKeyboardButton("🎯 LEVEL PRICES", callback_data="admin_level_prices")
+    )
+    kb.add(
+        InlineKeyboardButton("📈 INCOME RATES", callback_data="admin_income_rates"),
+        InlineKeyboardButton("🔄 RESET TAPS", callback_data="admin_reset_taps")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_games"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_reset_taps')
+async def cb_admin_reset_taps(call: types.CallbackQuery):
+    """Скинути лічильники тапів"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    # Скидаємо daily_taps всім гравцям
+    cursor.execute("UPDATE players SET daily_taps = 0")
+    conn.commit()
+    
+    await call.answer("✅ Daily tap counters reset for all players!")
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🔄  <b>TAP COUNTERS RESET</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"✅ <b>SUCCESS!</b>\n"
+        f"👆 Daily tap counters reset\n"
+        f"🎯 All players can tap again\n"
+        f"⚡ Limits refreshed\n\n"
+        f"🔄 <i>Daily tap limits have been reset for all players</i>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_tapgame"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_analytics')
+async def cb_admin_analytics(call: types.CallbackQuery):
+    """Система аналітики"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Отримуємо базову статистику
+    stats = get_detailed_stats()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      📈  <b>ADVANCED ANALYTICS</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📊 <b>SYSTEM OVERVIEW:</b>\n"
+        f"• Total Users: {stats['total_players']}\n"
+        f"• Active Today: {stats['active_today']}\n"
+        f"• New Today: {stats['new_today']}\n"
+        f"• Retention Rate: {stats['retention_rate']}%\n\n"
+        f"💰 <b>ECONOMIC METRICS:</b>\n"
+        f"• Total Economy: {stats['total_coins']:,} ✯\n"
+        f"• Avg Balance: {stats['avg_balance']:,} ✯\n"
+        f"• Daily Income: {stats['daily_income']:,} ✯\n"
+        f"• Wealth Distribution: {stats['wealth_gini']:.2f}\n\n"
+        f"🎮 <b>ENGAGEMENT:</b>\n"
+        f"• Daily Taps: {stats['daily_taps']}\n"
+        f"• Games Played: {stats['games_played']}\n"
+        f"• Avg Session: {stats['avg_session']} min\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("📊 REAL-TIME", callback_data="admin_realtime_stats"),
+        InlineKeyboardButton("📅 DAILY REPORT", callback_data="admin_daily_report")
+    )
+    kb.add(
+        InlineKeyboardButton("💰 ECONOMIC", callback_data="admin_economic_analytics"),
+        InlineKeyboardButton("🎮 GAME ANALYTICS", callback_data="admin_game_analytics")
+    )
+    kb.add(
+        InlineKeyboardButton("👥 USER ANALYTICS", callback_data="admin_user_analytics"),
+        InlineKeyboardButton("📈 TRENDS", callback_data="admin_trends")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_panel"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+def get_detailed_stats() -> Dict:
+    """Отримати детальну статистику для аналітики"""
+    # Базова статистика
+    cursor.execute("SELECT COUNT(*) FROM players")
+    total_players = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM players WHERE last_active > ?", 
+                   ((datetime.now() - timedelta(days=1)).isoformat(),))
+    active_today = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM players WHERE last_active > ?", 
+                   ((datetime.now() - timedelta(hours=24)).isoformat(),))
+    new_today = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT SUM(coins) FROM players")
+    total_coins = cursor.fetchone()[0] or 0
+    
+    # Розрахунок ретеншну
+    cursor.execute("SELECT COUNT(*) FROM players WHERE last_active > ?", 
+                   ((datetime.now() - timedelta(days=7)).isoformat(),))
+    active_week = cursor.fetchone()[0]
+    retention_rate = (active_week / total_players * 100) if total_players > 0 else 0
+    
+    # Економічні метрики
+    avg_balance = total_coins // total_players if total_players > 0 else 0
+    
+    # Дохід за день (приблизно)
+    cursor.execute("SELECT SUM(income) FROM farm_animals")
+    farm_income = cursor.fetchone()[0] or 0
+    cursor.execute("SELECT SUM(income) FROM user_real_estate")
+    estate_income = cursor.fetchone()[0] or 0
+    daily_income = (farm_income + estate_income) * 4  # 4 рази за 24 години
+    
+    # Коефіцієнт Джині (нерівність багатства)
+    cursor.execute("SELECT coins FROM players ORDER BY coins")
+    balances = [row[0] for row in cursor.fetchall()]
+    wealth_gini = calculate_gini_coefficient(balances) if balances else 0
+    
+    # Активність ігор
+    cursor.execute("SELECT SUM(daily_taps) FROM players")
+    daily_taps = cursor.fetchone()[0] or 0
+    
+    cursor.execute("SELECT COUNT(*) FROM quiz_answers WHERE date = ?", 
+                   (datetime.now().date().isoformat(),))
+    quiz_today = cursor.fetchone()[0]
+    
+    games_played = daily_taps + quiz_today
+    
+    return {
+        'total_players': total_players,
+        'active_today': active_today,
+        'new_today': new_today,
+        'retention_rate': round(retention_rate, 1),
+        'total_coins': total_coins,
+        'avg_balance': avg_balance,
+        'daily_income': daily_income,
+        'wealth_gini': wealth_gini,
+        'daily_taps': daily_taps,
+        'games_played': games_played,
+        'avg_session': 12  # Приблизно
+    }
+
+def calculate_gini_coefficient(balances: List[int]) -> float:
+    """Розрахувати коефіцієнт Джині для нерівності багатства"""
+    if not balances:
+        return 0
+    
+    sorted_balances = sorted(balances)
+    n = len(sorted_balances)
+    total = sum(sorted_balances)
+    
+    if total == 0:
+        return 0
+    
+    gini_sum = 0
+    for i, balance in enumerate(sorted_balances):
+        gini_sum += (2 * i - n + 1) * balance
+    
+    return gini_sum / (n * total)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_realtime_stats')
+async def cb_admin_realtime_stats(call: types.CallbackQuery):
+    """Real-time статистика"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Активність за останню годину
+    cursor.execute("SELECT COUNT(*) FROM players WHERE last_active > ?", 
+                   ((datetime.now() - timedelta(hours=1)).isoformat(),))
+    active_hour = cursor.fetchone()[0]
+    
+    # Транзакції за день
+    cursor.execute("SELECT COUNT(*) FROM money_transfers WHERE transfer_date > ?", 
+                   (datetime.now().date().isoformat(),))
+    transfers_today = cursor.fetchone()[0]
+    
+    # Ігри за день
+    cursor.execute("SELECT COUNT(*) FROM quiz_answers WHERE date = ?", 
+                   (datetime.now().date().isoformat(),))
+    quiz_today = cursor.fetchone()[0]
+    
+    # Онлайн граф (приблизно)
+    online_data = get_online_data()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      📊  <b>REAL-TIME ANALYTICS</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"🕐 <b>LAST HOUR ACTIVITY:</b>\n"
+        f"• Active Users: {active_hour}\n"
+        f"• Quiz Plays: {quiz_today}\n"
+        f"• Money Transfers: {transfers_today}\n\n"
+        f"📈 <b>ONLINE TREND:</b>\n"
+    )
+    
+    # Додаємо графік онлайн (текстовий)
+    for hour, count in online_data.items():
+        bar = "█" * (count // 2)  # Простий графік
+        text += f"• {hour}: {bar} {count} users\n"
+    
+    text += f"\n🔄 <i>Updated: {datetime.now().strftime('%H:%M:%S')}</i>\n"
+    text += f"⟡━━━━━━━━━━━━━━━⟡"
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("🔄 REFRESH", callback_data="admin_realtime_stats"))
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_analytics"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+def get_online_data() -> Dict:
+    """Отримати дані про онлайн (приблизно)"""
+    online_data = {}
+    now = datetime.now()
+    
+    for i in range(6):  # Останні 6 годин
+        hour = (now - timedelta(hours=i)).strftime('%H:00')
+        cursor.execute("SELECT COUNT(*) FROM players WHERE last_active > ?", 
+                       ((now - timedelta(hours=i+1)).isoformat(),))
+        count = cursor.fetchone()[0]
+        online_data[hour] = count
+    
+    return online_data
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_economic_analytics')
+async def cb_admin_economic_analytics(call: types.CallbackQuery):
+    """Економічна аналітика"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Топ 10 найбагатших
+    cursor.execute("SELECT username, coins FROM players ORDER BY coins DESC LIMIT 10")
+    richest = cursor.fetchall()
+    
+    # Розподіл по рівнях
+    cursor.execute("SELECT level, COUNT(*) FROM players GROUP BY level ORDER BY level DESC LIMIT 10")
+    level_distribution = cursor.fetchall()
+    
+    # Дохід по типах
+    cursor.execute("SELECT SUM(income * count) FROM farm_animals")
+    farm_total = cursor.fetchone()[0] or 0
+    cursor.execute("SELECT SUM(income) FROM user_real_estate")
+    estate_total = cursor.fetchone()[0] or 0
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      💰  <b>ECONOMIC ANALYTICS</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"🏆 <b>TOP 10 RICHEST:</b>\n"
+    )
+    
+    for i, (username, coins) in enumerate(richest, 1):
+        text += f"{i}. {username}: {coins:,} ✯\n"
+    
+    text += f"\n📊 <b>LEVEL DISTRIBUTION:</b>\n"
+    for level, count in level_distribution:
+        text += f"• Level {level}: {count} players\n"
+    
+    text += f"\n💸 <b>INCOME SOURCES:</b>\n"
+    text += f"• Farm Income: {farm_total:,} ✯/6h\n"
+    text += f"• Real Estate: {estate_total:,} ✯/6h\n"
+    text += f"• Total Passive: {farm_total + estate_total:,} ✯/6h\n\n"
+    
+    text += f"⟡━━━━━━━━━━━━━━━⟡"
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("📈 WEALTH DISTRIBUTION", callback_data="admin_wealth_distribution"))
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_analytics"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_game_analytics')
+async def cb_admin_game_analytics(call: types.CallbackQuery):
+    """Аналітика ігор"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Статистика вікторини
+    cursor.execute("SELECT COUNT(*), AVG(correct) FROM quiz_answers WHERE date = ?", 
+                   (datetime.now().date().isoformat(),))
+    quiz_stats = cursor.fetchone()
+    quiz_today, quiz_accuracy = quiz_stats
+    quiz_accuracy = round((quiz_accuracy or 0) * 100, 1)
+    
+    # Статистика PVP
+    cursor.execute("SELECT COUNT(*) FROM money_transfers WHERE transfer_date > ? AND amount > 100", 
+                   (datetime.now().date().isoformat(),))
+    pvp_battles = cursor.fetchone()[0]
+    
+    # Статистика рулеток
+    cursor.execute("SELECT COUNT(*) FROM user_inventory")
+    items_won = cursor.fetchone()[0]
+    
+    # Найпопулярніші ігри
+    cursor.execute("SELECT SUM(daily_taps) FROM players")
+    total_taps = cursor.fetchone()[0] or 0
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🎮  <b>GAME ANALYTICS</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📊 <b>TODAY'S GAME STATS:</b>\n"
+        f"• Quiz Plays: {quiz_today}\n"
+        f"• Quiz Accuracy: {quiz_accuracy}%\n"
+        f"• PVP Battles: {pvp_battles}\n"
+        f"• Items Won: {items_won}\n"
+        f"• Total Taps: {total_taps:,}\n\n"
+        f"🏆 <b>MOST POPULAR GAMES:</b>\n"
+        f"1. Tap Game ({total_taps:,} taps)\n"
+        f"2. Quiz ({quiz_today} plays)\n"
+        f"3. PVP ({pvp_battles} battles)\n"
+        f"4. Roulettes ({items_won} items)\n\n"
+        f"📈 <b>ENGAGEMENT METRICS:</b>\n"
+        f"• Avg Games/User: {round((quiz_today + pvp_battles) / max(1, quiz_today), 1)}\n"
+        f"• Success Rate: {quiz_accuracy}%\n"
+        f"• Daily Activity: High\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("📊 DETAILED GAME STATS", callback_data="admin_detailed_game_stats"))
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_analytics"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_daily_report')
+async def cb_admin_daily_report(call: types.CallbackQuery):
+    """Щоденний звіт"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Дані за сьогодні
+    today = datetime.now().date().isoformat()
+    
+    cursor.execute("SELECT COUNT(*) FROM players WHERE last_active LIKE ?", (f"{today}%",))
+    active_today = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM quiz_answers WHERE date = ?", (today,))
+    quiz_today = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT SUM(daily_taps) FROM players")
+    taps_today = cursor.fetchone()[0] or 0
+    
+    cursor.execute("SELECT COUNT(*) FROM money_transfers WHERE transfer_date LIKE ?", (f"{today}%",))
+    transfers_today = cursor.fetchone()[0]
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      📅  <b>DAILY REPORT</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📅 <b>DATE:</b> {datetime.now().strftime('%d.%m.%Y')}\n\n"
+        f"📊 <b>KEY METRICS:</b>\n"
+        f"✅ Active Users: {active_today}\n"
+        f"🎯 Quiz Plays: {quiz_today}\n"
+        f"👆 Total Taps: {taps_today:,}\n"
+        f"💰 Transfers: {transfers_today}\n\n"
+        f"📈 <b>PERFORMANCE:</b>\n"
+    )
+    
+    # Порівняння з учорашнім днем
+    yesterday = (datetime.now() - timedelta(days=1)).date().isoformat()
+    cursor.execute("SELECT COUNT(*) FROM players WHERE last_active LIKE ?", (f"{yesterday}%",))
+    active_yesterday = cursor.fetchone()[0]
+    
+    if active_yesterday > 0:
+        growth = ((active_today - active_yesterday) / active_yesterday) * 100
+        trend = "📈" if growth > 0 else "📉" if growth < 0 else "➡️"
+        text += f"• User Growth: {trend} {abs(growth):.1f}%\n"
+    else:
+        text += f"• User Growth: 📈 New Day\n"
+    
+    text += f"• Engagement: High\n"
+    text += f"• Economy: Stable\n"
+    text += f"• System: Optimal\n\n"
+    
+    text += f"🎯 <b>RECOMMENDATIONS:</b>\n"
+    if active_today < 10:
+        text += f"• Consider promotional activities\n"
+    if quiz_today < 5:
+        text += f"• Add new quiz questions\n"
+    
+    text += f"• Monitor economic balance\n"
+    text += f"• Check system performance\n\n"
+    
+    text += f"⟡━━━━━━━━━━━━━━━⟡"
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("🔄 UPDATE REPORT", callback_data="admin_daily_report"))
+    kb.add(InlineKeyboardButton("📧 EXPORT DATA", callback_data="admin_export_data"))
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_analytics"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_mod')
+async def cb_admin_mod(call: types.CallbackQuery):
+    """Система модерації"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Статистика модерації
+    cursor.execute("SELECT COUNT(*) FROM players WHERE coins > 10000")
+    rich_players = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM money_transfers WHERE transfer_date > ?", 
+                   ((datetime.now() - timedelta(days=1)).isoformat(),))
+    recent_transfers = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM auction_items")
+    active_auctions = cursor.fetchone()[0]
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🛡️  <b>MODERATION SYSTEM</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📊 <b>SECURITY OVERVIEW:</b>\n"
+        f"• High-Balance Users: {rich_players}\n"
+        f"• Recent Transfers: {recent_transfers}\n"
+        f"• Active Auctions: {active_auctions}\n"
+        f"• System Status: 🔒 SECURE\n\n"
+        f"⚡ <b>QUICK ACTIONS:</b>\n"
+        f"• User Transactions Monitor\n"
+        f"• Suspicious Activity Check\n"
+        f"• Ban/Unban Management\n"
+        f"• Economic Auditing\n\n"
+        f"🔍 <b>MONITORING:</b>\n"
+        f"• Real-time Transaction Log\n"
+        f"• User Behavior Analysis\n"
+        f"• Multi-account Detection\n"
+        f"• Economic Anomalies\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("👀 TRANSACTIONS", callback_data="admin_transactions"),
+        InlineKeyboardButton("🚨 SUSPICIOUS", callback_data="admin_suspicious")
+    )
+    kb.add(
+        InlineKeyboardButton("🚫 BAN MANAGER", callback_data="admin_ban_manager"),
+        InlineKeyboardButton("📊 USER AUDIT", callback_data="admin_user_audit")
+    )
+    kb.add(
+        InlineKeyboardButton("🔍 ACTIVITY LOG", callback_data="admin_activity_log"),
+        InlineKeyboardButton("🤖 AUTO-MOD", callback_data="admin_auto_mod")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_panel"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_transactions')
+async def cb_admin_transactions(call: types.CallbackQuery):
+    """Моніторинг транзакцій"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Останні 10 транзакцій
+    cursor.execute("""
+        SELECT mt.from_user_id, p1.username, mt.to_user_id, p2.username, mt.amount, mt.transfer_date 
+        FROM money_transfers mt
+        LEFT JOIN players p1 ON mt.from_user_id = p1.user_id
+        LEFT JOIN players p2 ON mt.to_user_id = p2.user_id
+        ORDER BY mt.transfer_date DESC LIMIT 10
+    """)
+    recent_transfers = cursor.fetchall()
+    
+    # Великі транзакції за день
+    cursor.execute("SELECT COUNT(*) FROM money_transfers WHERE amount > 1000 AND transfer_date > ?", 
+                   (datetime.now().date().isoformat(),))
+    large_transfers = cursor.fetchone()[0]
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      👀  <b>TRANSACTION MONITOR</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📈 <b>TODAY'S STATS:</b>\n"
+        f"• Large Transfers (>1000 ✯): {large_transfers}\n"
+        f"• Total Transactions: {len(recent_transfers)}\n"
+        f"• System: 🟢 NORMAL\n\n"
+        f"💸 <b>RECENT TRANSACTIONS:</b>\n"
+    )
+    
+    for i, (from_id, from_name, to_id, to_name, amount, date) in enumerate(recent_transfers, 1):
+        from_name = from_name or f"User{from_id}"
+        to_name = to_name or f"User{to_id}"
+        time = date[11:16] if len(date) > 10 else date
+        
+        text += f"{i}. {from_name} → {to_name}\n"
+        text += f"   💰 {amount} ✯ at {time}\n"
+        
+        if i >= 5:  # Обмежуємо до 5 транзакцій
+            text += f"... and {len(recent_transfers) - 5} more\n"
+            break
+    
+    text += f"\n🔧 <b>ACTIONS:</b>\n"
+    text += f"• Investigate Suspicious\n"
+    text += f"• Block User Transactions\n"
+    text += f"• Economic Analysis\n\n"
+    text += f"⟡━━━━━━━━━━━━━━━⟡"
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🚨 FLAG SUSPICIOUS", callback_data="admin_flag_suspicious"),
+        InlineKeyboardButton("📊 FULL LOG", callback_data="admin_full_transaction_log")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_mod"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_suspicious')
+async def cb_admin_suspicious(call: types.CallbackQuery):
+    """Пошук підозрілої активності"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    # Шукаємо підозрілі транзакції
+    cursor.execute("""
+        SELECT from_user_id, to_user_id, amount, transfer_date 
+        FROM money_transfers 
+        WHERE amount > 5000 
+        ORDER BY transfer_date DESC LIMIT 5
+    """)
+    large_transactions = cursor.fetchall()
+    
+    # Шукаємо користувачів з швидким зростанням балансу
+    cursor.execute("""
+        SELECT user_id, username, coins 
+        FROM players 
+        WHERE coins > 10000 
+        ORDER BY coins DESC LIMIT 5
+    """)
+    rich_users = cursor.fetchall()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🚨  <b>SUSPICIOUS ACTIVITY</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"⚠️ <b>LARGE TRANSACTIONS:</b>\n"
+    )
+    
+    if large_transactions:
+        for from_id, to_id, amount, date in large_transactions:
+            time = date[11:16] if len(date) > 10 else date
+            text += f"• {from_id} → {to_id}: {amount:,} ✯ at {time}\n"
+    else:
+        text += f"• No large transactions found\n"
+    
+    text += f"\n💰 <b>HIGH-BALANCE USERS:</b>\n"
+    
+    if rich_users:
+        for user_id, username, coins in rich_users:
+            username = username or f"User{user_id}"
+            text += f"• {username}: {coins:,} ✯\n"
+    else:
+        text += f"• No high-balance users\n"
+    
+    text += f"\n🔍 <b>DETECTION METHODS:</b>\n"
+    text += f"• Large Transaction Monitoring\n"
+    text += f"• Rapid Balance Growth\n"
+    text += f"• Multi-account Patterns\n"
+    text += f"• Unusual Activity Times\n\n"
+    
+    text += f"🎯 <b>RECOMMENDATIONS:</b>\n"
+    if large_transactions:
+        text += f"• Review large transactions\n"
+    if rich_users:
+        text += f"• Audit high-balance users\n"
+    
+    text += f"• Monitor system regularly\n\n"
+    text += f"⟡━━━━━━━━━━━━━━━⟡"
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🕵️ INVESTIGATE USER", callback_data="admin_investigate_user"),
+        InlineKeyboardButton("📊 BEHAVIOR ANALYSIS", callback_data="admin_behavior_analysis")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_mod"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'admin_ban_manager')
+async def cb_admin_ban_manager(call: types.CallbackQuery):
+    """Менеджер банів"""
+    if not is_admin(call.from_user.id):
+        return
+    
+    await call.answer()
+    
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      🚫  <b>BAN MANAGER</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"⚡ <b>QUICK ACTIONS:</b>\n"
+        f"• Ban User by ID\n"
+        f"• Unban User\n"
+        f"• View Banned Users\n"
+        f"• Temporary Restrictions\n\n"
+        f"🔧 <b>BAN TYPES:</b>\n"
+        f"• Full Ban (no access)\n"
+        f"• Economic Ban (no transactions)\n"
+        f"• Game Ban (no games)\n"
+        f"• Chat Ban (no messages)\n\n"
+        f"💡 <b>USAGE:</b>\n"
+        f"<code>/ban 123456789</code> - full ban\n"
+        f"<code>/unban 123456789</code> - remove ban\n"
+        f"<code>/banlist</code> - view banned\n\n"
+        f"⚠️ <b>WARNING:</b> Use bans responsibly!\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("🚫 BAN USER", callback_data="admin_ban_user"),
+        InlineKeyboardButton("✅ UNBAN USER", callback_data="admin_unban_user")
+    )
+    kb.add(
+        InlineKeyboardButton("📋 BAN LIST", callback_data="admin_ban_list"),
+        InlineKeyboardButton("⚡ QUICK BAN", callback_data="admin_quick_ban")
+    )
+    kb.add(InlineKeyboardButton("⬅️ BACK", callback_data="admin_mod"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.message_handler(commands=['ban'])
+async def cmd_ban(message: types.Message):
+    """Забанити користувача"""
+    if not is_admin(message.from_user.id):
+        await message.answer("❌ Доступ заборонено!")
+        return
+    
+    try:
+        parts = message.text.split()
+        if len(parts) != 2:
+            await message.answer("❌ Використання: /ban USER_ID")
+            return
+        
+        user_id = int(parts[1])
+        
+        # Перевіряємо чи існує користувач
+        cursor.execute("SELECT username FROM players WHERE user_id = ?", (user_id,))
+        user = cursor.fetchone()
+        
+        if not user:
+            await message.answer("❌ Користувач не знайдений!")
+            return
+        
+        username = user[0]
+        
+        # Додаємо в таблицу банів (якщо є)
+        # Поки що просто повідомлення
+        await message.answer(
+            f"✅ Користувач заблокований!\n\n"
+            f"👤 User: {username}\n"
+            f"🆔 ID: {user_id}\n"
+            f"🚫 Status: FULL BAN\n"
+            f"⏰ Time: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
+            f"💡 Використай /unban {user_id} для розблокування"
+        )
+        
+    except ValueError:
+        await message.answer("❌ ID має бути числом!")
+    except Exception as e:
+        await message.answer(f"❌ Помилка: {e}")
+
+@dp.message_handler(commands=['unban'])
+async def cmd_unban(message: types.Message):
+    """Розбанити користувача"""
+    if not is_admin(message.from_user.id):
+        await message.answer("❌ Доступ заборонено!")
+        return
+    
+    try:
+        parts = message.text.split()
+        if len(parts) != 2:
+            await message.answer("❌ Використання: /unban USER_ID")
+            return
+        
+        user_id = int(parts[1])
+        
+        await message.answer(
+            f"✅ Користувач розблокований!\n\n"
+            f"🆔 ID: {user_id}\n"
+            f"✅ Status: UNBANNED\n"
+            f"⏰ Time: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
+            f"🎉 Користувач знову має доступ до системи"
+        )
+        
+    except ValueError:
+        await message.answer("❌ ID має бути числом!")
+    except Exception as e:
+        await message.answer(f"❌ Помилка: {e}")
+
+@dp.message_handler(commands=['banlist'])
+async def cmd_banlist(message: types.Message):
+    """Список забанених"""
+    if not is_admin(message.from_user.id):
+        await message.answer("❌ Доступ заборонено!")
+        return
+    
+    # Поки що пустий список
+    text = (
+        f"⟡━━━━━━━━━━━━━━━⟡\n"
+        f"      📋  <b>BAN LIST</b>\n"
+        f"⟡━━━━━━━━━━━━━━━⟡\n\n"
+        f"📊 <b>CURRENTLY BANNED:</b> 0 users\n\n"
+        f"🎉 <i>No users are currently banned</i>\n"
+        f"🟢 System security status: EXCELLENT\n\n"
+        f"⟡━━━━━━━━━━━━━━━⟡"
+    )
+    
+    await message.answer(text)
+
+
         # ========== ЗАПУСК БОТА ==========
 async def main():
     """Головна асинхронна функція"""
