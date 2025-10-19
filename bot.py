@@ -4143,22 +4143,227 @@ async def cb_simple_admin_panel(call: types.CallbackQuery):
 
 # ========== БАЗОВІ АДМІН-КОМАНДИ ==========
 
-@dp.message_handler(commands=['setcoins'])
-async def cmd_setcoins(message: types.Message):
-    """Нова проста версія"""
-    if not is_admin(message.from_user.id):
+@dp.message_handler(commands=['setcoin'])
+async def cmd_setcoin(message: types.Message):
+    """Встановити/додати/відняти монети гравцю"""
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ Доступ заборонено!")
         return
     
     try:
         parts = message.text.split()
-        user_id = int(parts[1])
-        amount = int(parts[2])
+        if len(parts) != 3:
+            await message.answer(
+                "💰 <b>КОМАНДА SETCOIN</b>\n\n"
+                "📝 <b>Використання:</b>\n"
+                "<code>/setcoin ID сумма</code> - встановити баланс\n"
+                "<code>/setcoin ID +сума</code> - додати монети\n"
+                "<code>/setcoin ID -сума</code> - відняти монети\n\n"
+                "🎯 <b>Приклади:</b>\n"
+                "<code>/setcoin 123456789 1000</code> - встановити 1000 ✯\n"
+                "<code>/setcoin 123456789 +500</code> - додати 500 ✯\n"
+                "<code>/setcoin 123456789 -200</code> - відняти 200 ✯\n\n"
+                "⚠️ <b>Увага:</b> Без знаку + чи - встановлює точний баланс!"
+            )
+            return
         
-        cursor.execute("UPDATE players SET coins = coins + ? WHERE user_id = ?", (amount, user_id))
+        user_id = int(parts[1])
+        amount_str = parts[2]
+        
+        # ВИПРАВЛЕНА ЛОГІКА: правильно визначаємо операцію
+        operation = "set"  # за замовчуванням - встановити
+        
+        if amount_str.startswith('+'):
+            operation = "add"
+            amount = int(amount_str[1:])
+        elif amount_str.startswith('-'):
+            operation = "subtract" 
+            amount = int(amount_str[1:])
+        else:
+            # Якщо немає + чи - на початку, то це встановлення значення
+            operation = "set"
+            amount = int(amount_str)
+        
+        # Перевіряємо чи гравець існує
+        cursor.execute("SELECT username, coins FROM players WHERE user_id = ?", (user_id,))
+        player_data = cursor.fetchone()
+        
+        if not player_data:
+            await message.answer("❌ Гравець не знайдений!")
+            return
+        
+        username, current_coins = player_data
+        admin_name = message.from_user.username or message.from_user.full_name
+        
+        # Виконуємо операцію
+        if operation == "add":
+            new_coins = current_coins + amount
+            cursor.execute("UPDATE players SET coins = coins + ? WHERE user_id = ?", (amount, user_id))
+            action_text = f"💰 Додано: +{amount} ✯"
+            
+        elif operation == "subtract":
+            new_coins = max(0, current_coins - amount)  # Щоб не було від'ємних
+            cursor.execute("UPDATE players SET coins = ? WHERE user_id = ?", (new_coins, user_id))
+            action_text = f"💰 Віднято: -{amount} ✯"
+            
+        else:  # set - ВСТАНОВИТИ значення
+            new_coins = max(0, amount)  # Щоб не було від'ємних
+            cursor.execute("UPDATE players SET coins = ? WHERE user_id = ?", (new_coins, user_id))
+            action_text = f"💰 Встановлено: {amount} ✯"
+        
         conn.commit()
         
-        await message.answer(f"✅ Баланс оновлено! Користувач {user_id} отримав {amount} ✯")
+        # Формуємо результат
+        result_text = (
+            f"✅ <b>БАЛАНС ОНОВЛЕНО</b>\n\n"
+            f"⟡━━━━━━━━━━━━━━━━━━━━━⟡\n"
+            f"👤 <b>Гравець:</b> {username}\n"
+            f"🆔 <b>ID:</b> {user_id}\n"
+            f"📊 <b>Операція:</b> {action_text}\n\n"
+            f"💎 <b>Старий баланс:</b> {current_coins} ✯\n"
+            f"💰 <b>Новий баланс:</b> {new_coins} ✯\n\n"
+            f"👮 <b>Адміністратор:</b> {admin_name}\n"
+            f"⏰ <b>Час:</b> {datetime.now().strftime('%H:%M:%S')}\n"
+            f"⟡━━━━━━━━━━━━━━━━━━━━━⟡"
+        )
         
+        await message.answer(result_text)
+        
+        # Додамо дебаг інформацію для перевірки
+        debug_info = (
+            f"🔧 <b>ДЕБАГ ІНФО:</b>\n"
+            f"Введено: {amount_str}\n"
+            f"Операція: {operation}\n"
+            f"Сума: {amount}\n"
+            f"Старий баланс: {current_coins}\n"
+            f"Новий баланс: {new_coins}"
+        )
+        print(debug_info)  # Для перевірки в консолі
+        
+        # Сповіщаємо гравця про зміни
+        try:
+            operation_emoji = "📈" if operation == "add" else "📉" if operation == "subtract" else "⚡"
+            await bot.send_message(
+                user_id,
+                f"{operation_emoji} <b>ВАШ БАЛАНС ОНОВЛЕНО</b>\n\n"
+                f"💎 <b>Старий баланс:</b> {current_coins} ✯\n"
+                f"💰 <b>Новий баланс:</b> {new_coins} ✯\n"
+                f"📊 <b>Операція:</b> {action_text}\n\n"
+                f"👮 <i>Адміністратор: {admin_name}</i>\n"
+                f"🕒 {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            )
+        except:
+            pass  # Якщо не вдалось сповістити гравця
+            
+    except ValueError:
+        await message.answer("❌ Помилка! Перевірте правильність введених даних.")
+    except Exception as e:
+        await message.answer(f"❌ Помилка: {e}")
+
+@dp.message_handler(commands=['setlevel'])
+async def cmd_setlevel(message: types.Message):
+    """Встановити/додати/відняти рівень гравцю"""
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ Доступ заборонено!")
+        return
+    
+    try:
+        parts = message.text.split()
+        if len(parts) != 3:
+            await message.answer(
+                "🎯 <b>КОМАНДА SETLEVEL</b>\n\n"
+                "📝 <b>Використання:</b>\n"
+                "<code>/setlevel ID рівень</code> - встановити рівень\n"
+                "<code>/setlevel ID +рівень</code> - додати рівні\n"
+                "<code>/setlevel ID -рівень</code> - відняти рівні\n\n"
+                "🎯 <b>Приклади:</b>\n"
+                "<code>/setlevel 123456789 10</code> - встановити 10 рівень\n"
+                "<code>/setlevel 123456789 +5</code> - додати 5 рівнів\n"
+                "<code>/setlevel 123456789 -2</code> - відняти 2 рівні\n\n"
+                "⚠️ <b>Увага:</b> Мінімальний рівень - 1!"
+            )
+            return
+        
+        user_id = int(parts[1])
+        level_str = parts[2]
+        
+        # Визначаємо тип операції
+        operation = "set"
+        if level_str.startswith('+'):
+            operation = "add"
+            levels = int(level_str[1:])
+        elif level_str.startswith('-'):
+            operation = "subtract"
+            levels = int(level_str[1:])
+        else:
+            operation = "set"
+            levels = int(level_str)
+        
+        # Перевіряємо чи гравець існує
+        cursor.execute("SELECT username, level FROM players WHERE user_id = ?", (user_id,))
+        player_data = cursor.fetchone()
+        
+        if not player_data:
+            await message.answer("❌ Гравець не знайдений!")
+            return
+        
+        username, current_level = player_data
+        admin_name = message.from_user.username or message.from_user.full_name
+        
+        # Виконуємо операцію
+        if operation == "add":
+            new_level = current_level + levels
+            cursor.execute("UPDATE players SET level = level + ? WHERE user_id = ?", (levels, user_id))
+            action_text = f"🎯 Додано: +{levels} рівнів"
+            
+        elif operation == "subtract":
+            new_level = max(1, current_level - levels)  # Мінімум 1 рівень
+            cursor.execute("UPDATE players SET level = ? WHERE user_id = ?", (new_level, user_id))
+            action_text = f"🎯 Віднято: -{levels} рівнів"
+            
+        else:  # set
+            new_level = max(1, levels)  # Мінімум 1 рівень
+            cursor.execute("UPDATE players SET level = ? WHERE user_id = ?", (new_level, user_id))
+            action_text = f"🎯 Встановлено: {levels} рівень"
+        
+        # Скидаємо XP для нового рівня
+        cursor.execute("UPDATE players SET xp = 0 WHERE user_id = ?", (user_id,))
+        conn.commit()
+        
+        # Формуємо результат
+        result_text = (
+            f"✅ <b>РІВЕНЬ ОНОВЛЕНО</b>\n\n"
+            f"⟡━━━━━━━━━━━━━━━━━━━━━⟡\n"
+            f"👤 <b>Гравець:</b> {username}\n"
+            f"🆔 <b>ID:</b> {user_id}\n"
+            f"📊 <b>Операція:</b> {action_text}\n\n"
+            f"🎯 <b>Старий рівень:</b> {current_level}\n"
+            f"⭐ <b>Новий рівень:</b> {new_level}\n"
+            f"📈 <b>XP скинуто:</b> 0/{new_level * XP_PER_LEVEL}\n\n"
+            f"👮 <b>Адміністратор:</b> Luna\n"
+            f"⏰ <b>Час:</b> {datetime.now().strftime('%H:%M:%S')}\n"
+            f"⟡━━━━━━━━━━━━━━━━━━━━━⟡"
+        )
+        
+        await message.answer(result_text)
+        
+        # Сповіщаємо гравця про зміни
+        try:
+            await bot.send_message(
+                user_id,
+                f"⭐ <b>ВАШ РІВЕНЬ ОНОВЛЕНО</b>\n\n"
+                f"🎯 <b>Старий рівень:</b> {current_level}\n"
+                f"⭐ <b>Новий рівень:</b> {new_level}\n"
+                f"📊 <b>Операція:</b> {action_text}\n"
+                f"📈 <b>Прогрес:</b> 0/{new_level * XP_PER_LEVEL} XP\n\n"
+                f"👮 <i>Адміністратор: Luna</i>\n"
+                f"🕒 {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            )
+        except:
+            pass
+            
+    except ValueError:
+        await message.answer("❌ Помилка! Перевірте правильність введених даних.")
     except Exception as e:
         await message.answer(f"❌ Помилка: {e}")
 
