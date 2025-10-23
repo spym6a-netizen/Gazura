@@ -13,7 +13,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils import executor
 
 # ========== КОНФИГ ==========
-BOT_TOKEN = "8259900558:AAHQVUzKQBtKF7N-Xp8smLmAiAf0Hu-hQHw"
+BOT_TOKEN = "8160983444:AAF-qKOw_MtVhFPtnejy3UcbPT59riKrsd8"
 XP_PER_LEVEL = 100
 INACTIVE_DAYS = 7
 DB_PATH = "data.db"
@@ -79,6 +79,72 @@ CREATE TABLE IF NOT EXISTS user_real_estate (
 )
 """)
 
+# ========== СИСТЕМА КРЕДИТІВ ==========
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS credit_types (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    max_amount INTEGER NOT NULL,
+    min_level INTEGER NOT NULL,
+    term_hours INTEGER NOT NULL,
+    interest_rate INTEGER NOT NULL,
+    description TEXT
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS user_credits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    credit_type INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    taken_date TEXT NOT NULL,
+    due_date TEXT NOT NULL,
+    remaining_amount INTEGER NOT NULL,
+    status TEXT DEFAULT 'active',
+    next_payment_date TEXT,
+    FOREIGN KEY (user_id) REFERENCES players (user_id)
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS credit_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    credit_id INTEGER NOT NULL,
+    payment_date TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    payment_type TEXT NOT NULL,
+    FOREIGN KEY (credit_id) REFERENCES user_credits (id)
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS credit_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    credit_type INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    taken_date TEXT NOT NULL,
+    closed_date TEXT,
+    status TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES players (user_id)
+)
+""")
+
+# Заповнюємо типи кредитів
+cursor.execute("SELECT COUNT(*) FROM credit_types")
+if cursor.fetchone()[0] == 0:
+    credit_types_data = [
+        (1, "🟢 Міні-кредит", 5000, 5, 24, 15, "Невеликий кредит для початківців"),
+        (2, "🔵 Стандартний", 20000, 10, 48, 25, "Ідеальний для розвитку бізнесу"),
+        (3, "🟣 Бізнес-кредит", 50000, 15, 72, 35, "Для серйозних інвестицій"),
+        (4, "🟠 Інвест-кредит", 100000, 20, 96, 50, "Максимальні можливості")
+    ]
+    cursor.executemany(
+        "INSERT INTO credit_types (id, name, max_amount, min_level, term_hours, interest_rate, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        credit_types_data
+    )
+
 # ДРУЗІ
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS friends (
@@ -139,6 +205,19 @@ CREATE TABLE IF NOT EXISTS auction_items (
     auction_price INTEGER NOT NULL,
     listed_date TEXT NOT NULL,
     FOREIGN KEY (user_id) REFERENCES players (user_id)
+)
+""")
+# ========== СИСТЕМА ЗАПИТІВ У ДРУЗІ ==========
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS friend_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_user_id INTEGER NOT NULL,
+    from_username TEXT NOT NULL,
+    to_user_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_date TEXT NOT NULL,
+    FOREIGN KEY (from_user_id) REFERENCES players (user_id),
+    FOREIGN KEY (to_user_id) REFERENCES players (user_id)
 )
 """)
 
@@ -301,8 +380,115 @@ except Exception as e:
     print(f"❌ Помилка оновлення таблиць: {e}")
 
 # ========== КОНСТАНТИ ==========
+# ========== СИСТЕМА КРЕДИТІВ ==========
+class CreditSystem:
+    CREDIT_TYPES = [
+        {
+            "id": 1, 
+            "name": "🟢 Міні-кредит", 
+            "max_amount": 5000, 
+            "min_level": 5, 
+            "term_hours": 24, 
+            "interest_rate": 15,
+            "description": "Невеликий кредит для початківців"
+        },
+        {
+            "id": 2, 
+            "name": "🔵 Стандартний", 
+            "max_amount": 20000, 
+            "min_level": 10, 
+            "term_hours": 48, 
+            "interest_rate": 25,
+            "description": "Ідеальний для розвитку бізнесу"
+        },
+        {
+            "id": 3, 
+            "name": "🟣 Бізнес-кредит", 
+            "max_amount": 50000, 
+            "min_level": 15, 
+            "term_hours": 72, 
+            "interest_rate": 35,
+            "description": "Для серйозних інвестицій"
+        },
+        {
+            "id": 4, 
+            "name": "🟠 Інвест-кредит", 
+            "max_amount": 100000, 
+            "min_level": 20, 
+            "term_hours": 96, 
+            "interest_rate": 50,
+            "description": "Максимальні можливості"
+        }
+    ]
+# ========== БІЗНЕС СИСТЕМА ==========
+class BusinessLicenses:
+    LICENSES = [
+        {"id": 1, "name": "🟢 BI License", "max_businesses": 4, "price": 16400},
+        {"id": 2, "name": "🔵 DS License", "max_businesses": 5, "price": 19400},
+        {"id": 3, "name": "🟣 GT License", "max_businesses": 6, "price": 32000}
+    ]
+
+class BusinessTypes:
+    BUSINESSES = [
+        {
+            "id": 1, 
+            "name": "🚕 Таксопарк", 
+            "min_level": 6, 
+            "base_price": 50000,
+            "type": "service",
+            "max_level": 10,
+            "upgrade_multiplier": 1.8,
+            "base_income": 300,
+            "income_multiplier": 1.5
+        },
+        {
+            "id": 2, 
+            "name": "🏪 Продуктовий магазин", 
+            "min_level": 8, 
+            "base_price": 100000,
+            "type": "retail",
+            "max_level": 10,
+            "upgrade_multiplier": 1.8,
+            "base_income": 600,
+            "income_multiplier": 1.5
+        },
+        {
+            "id": 3, 
+            "name": "🔧 Автосервіс", 
+            "min_level": 10, 
+            "base_price": 200000,
+            "type": "service",
+            "max_level": 10,
+            "upgrade_multiplier": 1.8,
+            "base_income": 1200,
+            "income_multiplier": 1.5
+        },
+        {
+            "id": 4, 
+            "name": "🍕 Ресторан", 
+            "min_level": 12, 
+            "base_price": 500000,
+            "type": "food",
+            "max_level": 10,
+            "upgrade_multiplier": 1.8,
+            "base_income": 3000,
+            "income_multiplier": 1.5
+        },
+        {
+            "id": 5, 
+            "name": "🏢 Офісний центр", 
+            "min_level": 15, 
+            "base_price": 1000000,
+            "type": "real_estate",
+            "max_level": 10,
+            "upgrade_multiplier": 1.8,
+            "base_income": 6000,
+            "income_multiplier": 1.5
+        }
+    ]
 class ItemRoulettePrizes:
     PRIZES = [
+        # Існуючі предмети
         {"name": "💎 Алмаз", "price": 500, "probability": 0.01, "type": "mineral", "id": 22},
         {"name": "🔮 Містичний кристал", "price": 300, "probability": 0.03, "type": "magic", "id": 55},
         {"name": "🪨 Камінь", "price": 7, "probability": 0.15, "type": "mineral", "id": 11},
@@ -312,14 +498,101 @@ class ItemRoulettePrizes:
         {"name": "🧪 Еліксир сили", "price": 200, "probability": 0.05, "type": "potion", "id": 77},
         {"name": "🌿 Цілюща трава", "price": 25, "probability": 0.14, "type": "potion", "id": 88},
         {"name": "⚔️ Меч воїна", "price": 350, "probability": 0.02, "type": "weapon", "id": 99},
-        # Нові предмети для машин
         {"name": "🚗 Кузов автомобіля", "price": 900, "probability": 0.015, "type": "car_part", "id": 100},
         {"name": "⚙️ Двигун автомобіля", "price": 1200, "probability": 0.012, "type": "car_part", "id": 101},
         {"name": "🛞 Колеса автомобіля", "price": 800, "probability": 0.018, "type": "car_part", "id": 102},
+        
+        # НОВІ ПРЕДМЕТИ - МІНЕРАЛИ ТА РУДИ
+        {"name": "💎 Діамант", "price": 1500, "probability": 0.005, "type": "mineral", "id": 201},
+        {"name": "🔴 Рубін", "price": 800, "probability": 0.008, "type": "mineral", "id": 202},
+        {"name": "🔵 Сапфір", "price": 750, "probability": 0.008, "type": "mineral", "id": 203},
+        {"name": "🟢 Смарагд", "price": 900, "probability": 0.007, "type": "mineral", "id": 204},
+        {"name": "🟡 Топаз", "price": 600, "probability": 0.01, "type": "mineral", "id": 205},
+        {"name": "🪨 Обсидіан", "price": 400, "probability": 0.02, "type": "mineral", "id": 206},
+        {"name": "⛏️ Мідна руда", "price": 60, "probability": 0.1, "type": "mineral", "id": 207},
+        {"name": "⚫ Вугілля", "price": 30, "probability": 0.15, "type": "mineral", "id": 208},
+        {"name": "🪨 Кремінь", "price": 20, "probability": 0.18, "type": "mineral", "id": 209},
+        
+        # НОВІ ПРЕДМЕТИ - МАГІЧНІ
+        {"name": "🔮 Кристал мудрості", "price": 1200, "probability": 0.006, "type": "magic", "id": 210},
+        {"name": "📜 Сувій телепортації", "price": 1500, "probability": 0.004, "type": "magic", "id": 211},
+        {"name": "✨ Зоряний пил", "price": 600, "probability": 0.015, "type": "magic", "id": 212},
+        {"name": "🔮 Око дракона", "price": 2000, "probability": 0.003, "type": "magic", "id": 213},
+        {"name": "💫 Місячний камінь", "price": 950, "probability": 0.007, "type": "magic", "id": 214},
+        
+        # НОВІ ПРЕДМЕТИ - ЗІЛЛЯ
+        {"name": "🧪 Еліксир невидимості", "price": 1800, "probability": 0.005, "type": "potion", "id": 215},
+        {"name": "🧴 Зілля здоров'я", "price": 300, "probability": 0.025, "type": "potion", "id": 216},
+        {"name": "⚗️ Еліксир швидкості", "price": 1200, "probability": 0.008, "type": "potion", "id": 217},
+        {"name": "🧪 Зілля удачі", "price": 2500, "probability": 0.002, "type": "potion", "id": 218},
+        {"name": "🌡️ Антидот", "price": 400, "probability": 0.02, "type": "potion", "id": 219},
+        
+        # НОВІ ПРЕДМЕТИ - ЗБРОЯ
+        {"name": "🛡️ Щит героя", "price": 800, "probability": 0.012, "type": "weapon", "id": 220},
+        {"name": "🏹 Лук снайпера", "price": 1100, "probability": 0.009, "type": "weapon", "id": 221},
+        {"name": "⚔️ Двосічний меч", "price": 1600, "probability": 0.006, "type": "weapon", "id": 222},
+        {"name": "🔪 Кинджал тіні", "price": 700, "probability": 0.015, "type": "weapon", "id": 223},
+        {"name": "🗡️ Короткий меч", "price": 450, "probability": 0.03, "type": "weapon", "id": 224},
+        
+        # НОВІ ПРЕДМЕТИ - АВТОЗАПЧАСТИНИ
+        {"name": "🚗 Спортивний кузов", "price": 2500, "probability": 0.004, "type": "car_part", "id": 225},
+        {"name": "⚙️ Турбодвигун", "price": 3000, "probability": 0.003, "type": "car_part", "id": 226},
+        {"name": "🛞 Спортивні диски", "price": 1500, "probability": 0.007, "type": "car_part", "id": 227},
+        {"name": "💺 Шкіряний салон", "price": 1800, "probability": 0.006, "type": "car_part", "id": 228},
+        {"name": "🔊 Аудіосистема", "price": 1200, "probability": 0.01, "type": "car_part", "id": 229},
+        
+        # СУПЕР РІДКІСНІ ПРЕДМЕТИ (10 штук)
+        {"name": "👑 Корона короля", "price": 10000, "probability": 0.001, "type": "legendary", "id": 300},
+        {"name": "🐉 Яйце дракона", "price": 15000, "probability": 0.0008, "type": "legendary", "id": 301},
+        {"name": "⚡ Громовий жезл", "price": 12000, "probability": 0.0009, "type": "legendary", "id": 302},
+        {"name": "🌌 Космічний артефакт", "price": 20000, "probability": 0.0005, "type": "legendary", "id": 303},
+        {"name": "💀 Череп демона", "price": 8000, "probability": 0.0012, "type": "legendary", "id": 304},
+        {"name": "🦄 Ріг єдинорога", "price": 13000, "probability": 0.0007, "type": "legendary", "id": 305},
+        {"name": "🧿 Амулет безсмертя", "price": 25000, "probability": 0.0004, "type": "legendary", "id": 306},
+        {"name": "⚗️ Філософський камінь", "price": 30000, "probability": 0.0003, "type": "legendary", "id": 307},
+        {"name": "🔱 Тризуб Посейдона", "price": 18000, "probability": 0.0006, "type": "legendary", "id": 308},
+        {"name": "🌟 Зірка бажань", "price": 35000, "probability": 0.0002, "type": "legendary", "id": 309},
     ]
 
+class ItemShop:
+    ITEMS = [
+        # Базові предмети для покупки
+        {"id": 11, "name": "🪨 Камінь", "price": 50, "category": "mineral"},
+        {"id": 207, "name": "⛏️ Мідна руда", "price": 120, "category": "mineral"},
+        {"id": 208, "name": "⚫ Вугілля", "price": 80, "category": "mineral"},
+        {"id": 209, "name": "🪨 Кремінь", "price": 60, "category": "mineral"},
+        {"id": 33, "name": "⛏️ Залізна руда", "price": 200, "category": "mineral"},
+        
+        # Магічні предмети
+        {"id": 88, "name": "🌿 Цілюща трава", "price": 100, "category": "potion"},
+        {"id": 66, "name": "📜 Старовинний сувій", "price": 250, "category": "magic"},
+        {"id": 212, "name": "✨ Зоряний пил", "price": 800, "category": "magic"},
+        {"id": 219, "name": "🌡️ Антидот", "price": 500, "category": "potion"},
+        
+        # Зброя
+        {"id": 224, "name": "🗡️ Короткий меч", "price": 600, "category": "weapon"},
+        {"id": 223, "name": "🔪 Кинджал тіні", "price": 900, "category": "weapon"},
+        {"id": 220, "name": "🛡️ Щит героя", "price": 1000, "category": "weapon"},
+        
+        # Автозапчастини
+        {"id": 100, "name": "🚗 Кузов автомобіля", "price": 1200, "category": "car_part"},
+        {"id": 102, "name": "🛞 Колеса автомобіля", "price": 1000, "category": "car_part"},
+        {"id": 229, "name": "🔊 Аудіосистема", "price": 1500, "category": "car_part"},
+    ]
+
+# Групування предметів по категоріям
+ITEMS_BY_CATEGORY = {}
+for item in ItemShop.ITEMS:
+    category = item["category"]
+    if category not in ITEMS_BY_CATEGORY:
+        ITEMS_BY_CATEGORY[category] = []
+    ITEMS_BY_CATEGORY[category].append(item)
+
+# Словник для швидкого пошуку предметів за ID
+ITEM_BY_ID = {item["id"]: item for item in ItemRoulettePrizes.PRIZES}
 class CraftingRecipes:
     RECIPES = [
+        # Існуючі рецепти
         {
             "id": 1,
             "name": "💎 Кальє з алмазу",
@@ -342,6 +615,146 @@ class CraftingRecipes:
                 {"name": "🚗 Кузов автомобіля", "quantity": 1},
                 {"name": "⚙️ Двигун автомобіля", "quantity": 1},
                 {"name": "🛞 Колеса автомобіля", "quantity": 1}
+            ]
+        },
+        
+        # НОВІ РЕЦЕПТИ - ЮВЕЛІРКА
+        {
+            "id": 3,
+            "name": "👑 Проста корона",
+            "result": "👑 Проста корона",
+            "result_price": 3000,
+            "result_type": "jewelry",
+            "cost": 500,
+            "ingredients": [
+                {"name": "🪙 Золота руда", "quantity": 3},
+                {"name": "🔴 Рубін", "quantity": 1}
+            ]
+        },
+        {
+            "id": 4,
+            "name": "💍 Перстень магії",
+            "result": "💍 Перстень магії",
+            "result_price": 2500,
+            "result_type": "jewelry",
+            "cost": 400,
+            "ingredients": [
+                {"name": "🟢 Смарагд", "quantity": 1},
+                {"name": "🔮 Містичний кристал", "quantity": 2}
+            ]
+        },
+        
+        # НОВІ РЕЦЕПТИ - ЗБРОЯ
+        {
+            "id": 5,
+            "name": "⚔️ Легендарний меч",
+            "result": "⚔️ Легендарний меч",
+            "result_price": 5000,
+            "result_type": "weapon",
+            "cost": 800,
+            "ingredients": [
+                {"name": "⚔️ Меч воїна", "quantity": 1},
+                {"name": "💎 Діамант", "quantity": 1},
+                {"name": "⛏️ Залізна руда", "quantity": 5}
+            ]
+        },
+        {
+            "id": 6,
+            "name": "🏹 Ельфійський лук",
+            "result": "🏹 Ельфійський лук",
+            "result_price": 3500,
+            "result_type": "weapon",
+            "cost": 600,
+            "ingredients": [
+                {"name": "🏹 Лук снайпера", "quantity": 1},
+                {"name": "💫 Місячний камінь", "quantity": 1},
+                {"name": "🌿 Цілюща трава", "quantity": 3}
+            ]
+        },
+        
+        # НОВІ РЕЦЕПТИ - МАГІЧНІ ПРЕДМЕТИ
+        {
+            "id": 7,
+            "name": "🔮 Сфера пророцтв",
+            "result": "🔮 Сфера пророцтв",
+            "result_price": 6000,
+            "result_type": "magic",
+            "cost": 1000,
+            "ingredients": [
+                {"name": "🔮 Кристал мудрості", "quantity": 1},
+                {"name": "✨ Зоряний пил", "quantity": 3},
+                {"name": "📜 Старовинний сувій", "quantity": 2}
+            ]
+        },
+        {
+            "id": 8,
+            "name": "🧪 Великий еліксир",
+            "result": "🧪 Великий еліксир",
+            "result_price": 4000,
+            "result_type": "potion",
+            "cost": 700,
+            "ingredients": [
+                {"name": "🧪 Еліксир сили", "quantity": 1},
+                {"name": "🧴 Зілля здоров'я", "quantity": 2},
+                {"name": "🌡️ Антидот", "quantity": 1}
+            ]
+        },
+        
+        # НОВІ РЕЦЕПТИ - АВТОМОБІЛІ
+        {
+            "id": 9,
+            "name": "🚓 Поліцейська машина",
+            "result": "🚓 Поліцейська машина",
+            "result_price": 15000,
+            "result_type": "car",
+            "cost": 2000,
+            "ingredients": [
+                {"name": "🚗 Спортивний кузов", "quantity": 1},
+                {"name": "⚙️ Турбодвигун", "quantity": 1},
+                {"name": "🛞 Спортивні диски", "quantity": 1},
+                {"name": "🔊 Аудіосистема", "quantity": 1}
+            ]
+        },
+        {
+            "id": 10,
+            "name": "🚚 Вантажівка",
+            "result": "🚚 Вантажівка",
+            "result_price": 12000,
+            "result_type": "car",
+            "cost": 1500,
+            "ingredients": [
+                {"name": "🚗 Кузов автомобіля", "quantity": 2},
+                {"name": "⚙️ Двигун автомобіля", "quantity": 2},
+                {"name": "🛞 Колеса автомобіля", "quantity": 6}
+            ]
+        },
+        
+        # ЛЕГЕНДАРНІ РЕЦЕПТИ
+        {
+            "id": 11,
+            "name": "🐉 Драконічний меч",
+            "result": "🐉 Драконічний меч",
+            "result_price": 25000,
+            "result_type": "legendary",
+            "cost": 5000,
+            "ingredients": [
+                {"name": "⚔️ Легендарний меч", "quantity": 1},
+                {"name": "🐉 Яйце дракона", "quantity": 1},
+                {"name": "🔮 Око дракона", "quantity": 1}
+            ]
+        },
+        {
+            "id": 12,
+            "name": "🌟 Артефакт богів",
+            "result": "🌟 Артефакт богів",
+            "result_price": 50000,
+            "result_type": "legendary",
+            "cost": 10000,
+            "ingredients": [
+                {"name": "👑 Корона короля", "quantity": 1},
+                {"name": "🌌 Космічний артефакт", "quantity": 1},
+                {"name": "🧿 Амулет безсмертя", "quantity": 1},
+                {"name": "⚗️ Філософський камінь", "quantity": 1}
             ]
         }
     ]
@@ -435,7 +848,1244 @@ class DailyTasks:
         {"type": "buy_animals", "target": 2, "reward": 80, "description": "Купи 2 тварини"}
     ]
 
+
 # ========== БАЗОВІ ФУНКЦІЇ ==========
+
+# ========== СИСТЕМА КРЕДИТІВ - ФУНКЦІЇ ==========
+def get_user_active_credits(user_id: int) -> List[Dict]:
+    """Отримати активні кредити гравця"""
+    cursor.execute("""
+        SELECT uc.id, uc.credit_type, uc.amount, uc.taken_date, uc.due_date, 
+               uc.remaining_amount, uc.status, ct.name, ct.interest_rate
+        FROM user_credits uc
+        JOIN credit_types ct ON uc.credit_type = ct.id
+        WHERE uc.user_id = ? AND uc.status = 'active'
+        ORDER BY uc.taken_date DESC
+    """, (user_id,))
+    
+    credits = []
+    for row in cursor.fetchall():
+        credit_id, credit_type, amount, taken_date, due_date, remaining, status, name, interest = row
+        credits.append({
+            "id": credit_id,
+            "type_id": credit_type,
+            "amount": amount,
+            "taken_date": taken_date,
+            "due_date": due_date,
+            "remaining": remaining,
+            "status": status,
+            "name": name,
+            "interest_rate": interest
+        })
+    return credits
+
+def get_user_credit_history(user_id: int) -> List[Dict]:
+    """Отримати історію кредитів гравця"""
+    cursor.execute("""
+        SELECT ch.credit_type, ch.amount, ch.taken_date, ch.closed_date, ch.status, ct.name
+        FROM credit_history ch
+        JOIN credit_types ct ON ch.credit_type = ct.id
+        WHERE ch.user_id = ?
+        ORDER BY ch.taken_date DESC
+        LIMIT 10
+    """, (user_id,))
+    
+    history = []
+    for row in cursor.fetchall():
+        credit_type, amount, taken_date, closed_date, status, name = row
+        history.append({
+            "type_id": credit_type,
+            "amount": amount,
+            "taken_date": taken_date,
+            "closed_date": closed_date,
+            "status": status,
+            "name": name
+        })
+    return history
+
+def calculate_credit_interest(amount: int, interest_rate: int, term_hours: int) -> int:
+    """Розрахувати загальні відсотки по кредиту"""
+    # Відсотки розраховуються за весь термін
+    total_interest = (amount * interest_rate) // 100
+    return total_interest
+
+def can_take_credit(user_id: int, credit_type_id: int, amount: int) -> Dict:
+    """Перевірити чи може гравець взяти кредит"""
+    credit_type = next((ct for ct in CreditSystem.CREDIT_TYPES if ct["id"] == credit_type_id), None)
+    if not credit_type:
+        return {"can": False, "reason": "❌ Тип кредиту не знайдено!"}
+    
+    user_level = get_user_level(user_id)
+    if user_level < credit_type["min_level"]:
+        return {"can": False, "reason": f"❌ Потрібен {credit_type['min_level']} рівень! (у вас {user_level})"}
+    
+    if amount > credit_type["max_amount"]:
+        return {"can": False, "reason": f"❌ Максимальна сума: {credit_type['max_amount']:,} ✯"}
+    
+    if amount < 100:
+        return {"can": False, "reason": "❌ Мінімальна сума: 100 ✯"}
+    
+    # Перевіряємо чи не перевищує кредит 50% від загального доходу
+    total_income = get_total_passive_income(user_id)
+    max_recommended = total_income * 12  # Максимум - дохід за 12 годин
+    if amount > max_recommended and total_income > 0:
+        return {"can": False, "reason": f"❌ Занадто великий кредит! Максимум: {max_recommended:,} ✯"}
+    
+    # Перевіряємо чи немає вже активних кредитів
+    active_credits = get_user_active_credits(user_id)
+    if active_credits:
+        return {"can": False, "reason": "❌ У вас вже є активний кредит!"}
+    
+    return {"can": True, "reason": "✅ Можна взяти кредит!"}
+
+def take_credit(user_id: int, credit_type_id: int, amount: int) -> bool:
+    """Взяти кредит"""
+    check = can_take_credit(user_id, credit_type_id, amount)
+    if not check["can"]:
+        return False
+    
+    credit_type = next((ct for ct in CreditSystem.CREDIT_TYPES if ct["id"] == credit_type_id), None)
+    if not credit_type:
+        return False
+    
+    # Розраховуємо загальну суму до сплати
+    total_interest = calculate_credit_interest(amount, credit_type["interest_rate"], credit_type["term_hours"])
+    total_amount = amount + total_interest
+    
+    # Додаємо кредит
+    taken_date = datetime.now()
+    due_date = taken_date + timedelta(hours=credit_type["term_hours"])
+    next_payment = taken_date + timedelta(hours=1)  # Перша виплата через годину
+    
+    cursor.execute("""
+        INSERT INTO user_credits (user_id, credit_type, amount, taken_date, due_date, remaining_amount, next_payment_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (user_id, credit_type_id, amount, taken_date.isoformat(), due_date.isoformat(), total_amount, next_payment.isoformat()))
+    
+    # Додаємо в історію
+    cursor.execute("""
+        INSERT INTO credit_history (user_id, credit_type, amount, taken_date, status)
+        VALUES (?, ?, ?, ?, ?)
+    """, (user_id, credit_type_id, amount, taken_date.isoformat(), 'active'))
+    
+    # Видаємо гроші гравцю
+    add_user_coins(user_id, amount)
+    
+    conn.commit()
+    return True
+
+def process_credit_payments():
+    """Обробити виплати по кредитах (викликати кожну годину)"""
+    current_time = datetime.now()
+    
+    # Знаходимо кредити, по яких треба зробити виплату
+    cursor.execute("""
+        SELECT uc.id, uc.user_id, uc.remaining_amount, uc.amount, ct.interest_rate, ct.term_hours
+        FROM user_credits uc
+        JOIN credit_types ct ON uc.credit_type = ct.id
+        WHERE uc.status = 'active' AND uc.next_payment_date <= ?
+    """, (current_time.isoformat(),))
+    
+    credits_to_process = cursor.fetchall()
+    
+    for credit in credits_to_process:
+        credit_id, user_id, remaining, original_amount, interest_rate, term_hours = credit
+        
+        # Розраховуємо щогодинну виплату
+        total_interest = calculate_credit_interest(original_amount, interest_rate, term_hours)
+        total_amount = original_amount + total_interest
+        hourly_payment = total_amount // term_hours
+        
+        # Перевіряємо чи вистачає грошей у гравця
+        user_coins = get_user_coins(user_id)
+        user_income = get_total_passive_income(user_id)
+        
+        if user_coins >= hourly_payment:
+            # Списуємо виплату
+            cursor.execute("UPDATE players SET coins = coins - ? WHERE user_id = ?", (hourly_payment, user_id))
+            cursor.execute("UPDATE user_credits SET remaining_amount = remaining_amount - ? WHERE id = ?", (hourly_payment, credit_id))
+            
+            # Записуємо виплату
+            cursor.execute("""
+                INSERT INTO credit_payments (credit_id, payment_date, amount, payment_type)
+                VALUES (?, ?, ?, ?)
+            """, (credit_id, current_time.isoformat(), hourly_payment, 'auto'))
+            
+            # Оновлюємо наступну дату виплати
+            next_payment = current_time + timedelta(hours=1)
+            cursor.execute("UPDATE user_credits SET next_payment_date = ? WHERE id = ?", (next_payment.isoformat(), credit_id))
+            
+            print(f"💳 Виплата по кредиту {credit_id}: {hourly_payment} ✯")
+            
+        else:
+            # Не вистачає грошей - мітка про прострочення
+            cursor.execute("UPDATE user_credits SET status = 'overdue' WHERE id = ?", (credit_id,))
+            print(f"⚠️ Прострочення по кредиту {credit_id}")
+        
+        # Перевіряємо чи кредит повністю погашено
+        cursor.execute("SELECT remaining_amount FROM user_credits WHERE id = ?", (credit_id,))
+        new_remaining = cursor.fetchone()[0]
+        
+        if new_remaining <= 0:
+            cursor.execute("UPDATE user_credits SET status = 'paid' WHERE id = ?", (credit_id,))
+            cursor.execute("UPDATE credit_history SET closed_date = ?, status = 'paid' WHERE user_id = ? AND credit_type = ? AND status = 'active'", 
+                          (current_time.isoformat(), user_id, credit_id))
+            print(f"✅ Кредит {credit_id} повністю погашено!")
+    
+    conn.commit()
+
+def can_repay_credit_early(user_id: int, credit_id: int) -> Dict:
+    """Перевірити чи можна погасити кредит достроково"""
+    cursor.execute("""
+        SELECT uc.remaining_amount, uc.amount, ct.interest_rate
+        FROM user_credits uc
+        JOIN credit_types ct ON uc.credit_type = ct.id
+        WHERE uc.id = ? AND uc.user_id = ? AND uc.status = 'active'
+    """, (credit_id, user_id))
+    
+    result = cursor.fetchone()
+    if not result:
+        return {"can": False, "reason": "❌ Кредит не знайдено!"}
+    
+    remaining, original_amount, interest_rate = result
+    
+    # При достроковому погашенні - знижка 20% на відсотки
+    discount = (original_amount * interest_rate * 20) // 10000
+    final_amount = remaining - discount
+    
+    user_coins = get_user_coins(user_id)
+    if user_coins < final_amount:
+        return {"can": False, "reason": f"❌ Недостатньо монет! Потрібно {final_amount:,} ✯"}
+    
+    return {"can": True, "reason": "✅ Можна погасити достроково!", "amount": final_amount, "discount": discount}
+
+def repay_credit_early(user_id: int, credit_id: int) -> bool:
+    """Погасити кредит достроково"""
+    check = can_repay_credit_early(user_id, credit_id)
+    if not check["can"]:
+        return False
+    
+    final_amount = check["amount"]
+    
+    # Списуємо гроші
+    cursor.execute("UPDATE players SET coins = coins - ? WHERE user_id = ?", (final_amount, user_id))
+    
+    # Закриваємо кредит
+    current_time = datetime.now()
+    cursor.execute("UPDATE user_credits SET status = 'paid_early', remaining_amount = 0 WHERE id = ?", (credit_id,))
+    cursor.execute("UPDATE credit_history SET closed_date = ?, status = 'paid_early' WHERE user_id = ? AND status = 'active'", 
+                  (current_time.isoformat(), user_id))
+    
+    # Записуємо виплату
+    cursor.execute("""
+        INSERT INTO credit_payments (credit_id, payment_date, amount, payment_type)
+        VALUES (?, ?, ?, ?)
+    """, (credit_id, current_time.isoformat(), final_amount, 'early'))
+    
+    conn.commit()
+    return True# ========== СИСТЕМА КРЕДИТІВ - МЕНЮ ==========
+def build_bank_menu(user_id: int):
+    """Побудувати меню банку"""
+    kb = InlineKeyboardMarkup(row_width=2)
+    
+    kb.add(
+        InlineKeyboardButton("💰 Взяти кредит", callback_data="bank_credits"),
+        InlineKeyboardButton("📊 Мої кредити", callback_data="bank_my_credits")
+    )
+    kb.add(
+        InlineKeyboardButton("💳 Виплатити", callback_data="bank_repay"),
+        InlineKeyboardButton("📋 Історія", callback_data="bank_history")
+    )
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_back|main"))
+    
+    return kb
+
+def build_credits_menu(user_id: int):
+    """Побудувати меню вибору кредиту"""
+    user_level = get_user_level(user_id)
+    active_credits = get_user_active_credits(user_id)
+    has_active_credit = len(active_credits) > 0
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    for credit_type in CreditSystem.CREDIT_TYPES:
+        if user_level >= credit_type["min_level"] and not has_active_credit:
+            button_text = f"{credit_type['name']} - до {credit_type['max_amount']:,} ✯"
+            callback_data = f"credit_choose_{credit_type['id']}"
+        elif has_active_credit:
+            button_text = f"🔴 {credit_type['name']} - є активний кредит"
+            callback_data = "credit_has_active"
+        else:
+            button_text = f"🔴 {credit_type['name']} - р. {credit_type['min_level']}+"
+            callback_data = "credit_level_low"
+        
+        kb.add(InlineKeyboardButton(button_text, callback_data=callback_data))
+    
+    if has_active_credit:
+        kb.add(InlineKeyboardButton("📊 Мої кредити", callback_data="bank_my_credits"))
+    
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="bank_loans"))
+    
+    return kb
+
+def build_my_credits_menu(user_id: int):
+    """Побудувати меню моїх кредитів"""
+    active_credits = get_user_active_credits(user_id)
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    if not active_credits:
+        kb.add(InlineKeyboardButton("💰 Взяти кредит", callback_data="bank_credits"))
+    else:
+        for credit in active_credits:
+            # Розраховуємо час до кінця
+            due_date = datetime.fromisoformat(credit['due_date'])
+            time_left = due_date - datetime.now()
+            hours_left = max(0, int(time_left.total_seconds() // 3600))
+            
+            button_text = f"{credit['name']} - {credit['remaining']:,} ✯ ({hours_left}г)"
+            kb.add(InlineKeyboardButton(button_text, callback_data=f"credit_view_{credit['id']}"))
+    
+    kb.add(InlineKeyboardButton("📋 Історія", callback_data="bank_history"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="bank_loans"))
+    
+    return kb
+
+def build_repay_menu(user_id: int):
+    """Побудувати меню виплат"""
+    active_credits = get_user_active_credits(user_id)
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    if not active_credits:
+        kb.add(InlineKeyboardButton("💰 Взяти кредит", callback_data="bank_credits"))
+    else:
+        for credit in active_credits:
+            check = can_repay_credit_early(user_id, credit['id'])
+            if check["can"]:
+                button_text = f"🟢 {credit['name']} - {check['amount']:,} ✯"
+                callback_data = f"credit_repay_{credit['id']}"
+            else:
+                button_text = f"🔴 {credit['name']} - {check['reason']}"
+                callback_data = "credit_cannot_repay"
+            
+            kb.add(InlineKeyboardButton(button_text, callback_data=callback_data))
+    
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="bank_loans"))
+    
+    return 
+# ========== БІЗНЕС СИСТЕМА - ФУНКЦІЇ ==========
+def get_user_business_license(user_id: int) -> Dict:
+    """Отримати інформацію про ліцензію гравця"""
+    cursor.execute("""
+        SELECT ul.license_id, ul.max_businesses, bl.name, bl.price
+        FROM user_business_licenses ul
+        JOIN business_licenses bl ON ul.license_id = bl.id
+        WHERE ul.user_id = ?
+    """, (user_id,))
+    
+    result = cursor.fetchone()
+    if result:
+        license_id, max_businesses, name, price = result
+        return {
+            "license_id": license_id,
+            "max_businesses": max_businesses,
+            "name": name,
+            "price": price
+        }
+    else:
+        # Створюємо запис за замовчуванням
+        cursor.execute(
+            "INSERT INTO user_business_licenses (user_id, license_id, max_businesses, purchased_date) VALUES (?, 1, 2, ?)",
+            (user_id, datetime.now().isoformat())
+        )
+        conn.commit()
+        return {
+            "license_id": 1,
+            "max_businesses": 2,
+            "name": "🟢 BI License",
+            "price": 16400
+        }
+
+def get_user_businesses(user_id: int) -> List[Dict]:
+    """Отримати бізнеси гравця"""
+    cursor.execute("""
+        SELECT ub.id, ub.business_type, ub.business_name, ub.level, ub.income, 
+               ub.purchased_date, bt.name, bt.base_price, bt.max_level
+        FROM user_businesses ub
+        JOIN business_types bt ON ub.business_type = bt.id
+        WHERE ub.user_id = ?
+        ORDER BY ub.purchased_date DESC
+    """, (user_id,))
+    
+    businesses = []
+    for row in cursor.fetchall():
+        business_id, business_type, business_name, level, income, purchased_date, type_name, base_price, max_level = row
+        businesses.append({
+            "id": business_id,
+            "type_id": business_type,
+            "name": business_name,
+            "level": level,
+            "income": income,
+            "purchased_date": purchased_date,
+            "type_name": type_name,
+            "base_price": base_price,
+            "max_level": max_level
+        })
+    return businesses
+
+def get_business_type_count(user_id: int, business_type: int) -> int:
+    """Отримати кількість бізнесів певного типу у гравця"""
+    cursor.execute("""
+        SELECT COUNT(*) FROM user_businesses 
+        WHERE user_id = ? AND business_type = ?
+    """, (user_id, business_type))
+    return cursor.fetchone()[0]
+
+def can_buy_business(user_id: int, business_type_id: int) -> Dict:
+    """Перевірити чи може гравець купити бізнес"""
+    business = next((b for b in BusinessTypes.BUSINESSES if b["id"] == business_type_id), None)
+    if not business:
+        return {"can": False, "reason": "❌ Бізнес не знайдено!"}
+    
+    user_level = get_user_level(user_id)
+    if user_level < business["min_level"]:
+        return {"can": False, "reason": f"❌ Потрібен {business['min_level']} рівень! (у вас {user_level})"}
+    
+    # Перевіряємо ліміт бізнесів одного типу (макс. 2)
+    same_type_count = get_business_type_count(user_id, business_type_id)
+    if same_type_count >= 2:
+        return {"can": False, "reason": f"❌ Максимум 2 бізнеси одного типу! (у вас {same_type_count})"}
+    
+    # Перевіряємо загальний ліміт бізнесів
+    license_info = get_user_business_license(user_id)
+    user_businesses = get_user_businesses(user_id)
+    if len(user_businesses) >= license_info["max_businesses"]:
+        return {"can": False, "reason": f"❌ Досягнуто ліміт бізнесів! ({license_info['max_businesses']})"}
+    
+    user_coins = get_user_coins(user_id)
+    if user_coins < business["base_price"]:
+        return {"can": False, "reason": f"❌ Недостатньо монет! Потрібно {business['base_price']} ✯"}
+    
+    return {"can": True, "reason": "✅ Можна купити бізнес!"}
+
+def buy_business(user_id: int, business_type_id: int) -> bool:
+    """Купити бізнес"""
+    check = can_buy_business(user_id, business_type_id)
+    if not check["can"]:
+        return False
+    
+    business = next((b for b in BusinessTypes.BUSINESSES if b["id"] == business_type_id), None)
+    if not business:
+        return False
+    
+    # Списуємо монети
+    cursor.execute("UPDATE players SET coins = coins - ? WHERE user_id = ?", 
+                   (business["base_price"], user_id))
+    
+    # Додаємо бізнес
+    cursor.execute("""
+        INSERT INTO user_businesses (user_id, business_type, business_name, level, income, purchased_date)
+        VALUES (?, ?, ?, 1, ?, ?)
+    """, (user_id, business_type_id, business["name"], business["base_income"], datetime.now().isoformat()))
+    
+    conn.commit()
+    return True
+
+def calculate_business_income(business_type_id: int, level: int) -> int:
+    """Розрахувати дохід бізнесу за рівень"""
+    business = next((b for b in BusinessTypes.BUSINESSES if b["id"] == business_type_id), None)
+    if not business:
+        return 0
+    
+    base_income = business["base_income"]
+    multiplier = business["income_multiplier"]
+    return int(base_income * (multiplier ** (level - 1)))
+
+def calculate_upgrade_price(business_type_id: int, current_level: int) -> int:
+    """Розрахувати ціну покращення бізнесу"""
+    business = next((b for b in BusinessTypes.BUSINESSES if b["id"] == business_type_id), None)
+    if not business:
+        return 0
+    
+    base_price = business["base_price"]
+    multiplier = business["upgrade_multiplier"]
+    return int(base_price * (multiplier ** (current_level - 1)))
+
+def can_upgrade_business(user_id: int, business_id: int) -> Dict:
+    """Перевірити чи можна покращити бізнес"""
+    cursor.execute("""
+        SELECT ub.level, ub.business_type, ub.income, bt.max_level, bt.name
+        FROM user_businesses ub
+        JOIN business_types bt ON ub.business_type = bt.id
+        WHERE ub.id = ? AND ub.user_id = ?
+    """, (business_id, user_id))
+    
+    result = cursor.fetchone()
+    if not result:
+        return {"can": False, "reason": "❌ Бізнес не знайдено!"}
+    
+    level, business_type, income, max_level, business_name = result
+    
+    if level >= max_level:
+        return {"can": False, "reason": f"❌ Бізнес вже максимального рівня! ({max_level})"}
+    
+    upgrade_price = calculate_upgrade_price(business_type, level)
+    user_coins = get_user_coins(user_id)
+    
+    if user_coins < upgrade_price:
+        return {"can": False, "reason": f"❌ Недостатньо монет! Потрібно {upgrade_price} ✯"}
+    
+    return {"can": True, "reason": "✅ Можна покращити бізнес!", "price": upgrade_price}
+
+def upgrade_business(user_id: int, business_id: int) -> bool:
+    """Покращити бізнес"""
+    check = can_upgrade_business(user_id, business_id)
+    if not check["can"]:
+        return False
+    
+    cursor.execute("""
+        SELECT business_type, level FROM user_businesses 
+        WHERE id = ? AND user_id = ?
+    """, (business_id, user_id))
+    
+    result = cursor.fetchone()
+    if not result:
+        return False
+    
+    business_type, current_level = result
+    upgrade_price = calculate_upgrade_price(business_type, current_level)
+    new_level = current_level + 1
+    new_income = calculate_business_income(business_type, new_level)
+    
+    # Списуємо монети та оновлюємо бізнес
+    cursor.execute("UPDATE players SET coins = coins - ? WHERE user_id = ?", 
+                   (upgrade_price, user_id))
+    cursor.execute("UPDATE user_businesses SET level = ?, income = ? WHERE id = ?", 
+                   (new_level, new_income, business_id))
+    
+    conn.commit()
+    return True
+
+def get_total_business_income(user_id: int) -> int:
+    """Отримати загальний дохід від усіх бізнесів"""
+    businesses = get_user_businesses(user_id)
+    total_income = sum(business["income"] for business in businesses)
+    return total_income
+
+def update_business_income_for_user(user_id: int):
+    """Оновити дохід від бізнесів для гравця (кожні 6 годин)"""
+    businesses = get_user_businesses(user_id)
+    if not businesses:
+        return
+    
+    total_income = get_total_business_income(user_id)
+    
+    # Додаємо дохід до балансу
+    if total_income > 0:
+        add_user_coins(user_id, total_income)
+        print(f"💼 Нараховано {total_income} ✯ від бізнесів гравцю {user_id}")
+
+
+# ========== СИСТЕМА КРЕДИТІВ - ОБРОБНИКИ ==========
+@dp.callback_query_handler(lambda c: c.data == 'bank_loans')
+async def cb_bank_loans(call: types.CallbackQuery):
+    """Головне меню банку"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    active_credits = get_user_active_credits(user_id)
+    total_debt = sum(credit['remaining'] for credit in active_credits)
+    
+    text = (
+        f"🏦 <b>Банк - Кредитна система</b>\n\n"
+        f"💼 Активних кредитів: {len(active_credits)}\n"
+        f"💸 Загальний борг: {total_debt:,} ✯\n"
+        f"💎 Ваш баланс: {get_user_coins(user_id):,} ✯\n"
+        f"📈 Ваш дохід: {get_total_passive_income(user_id)} ✯/6 год\n\n"
+        f"🚀 <b>Оберіть дію:</b>"
+    )
+    
+    await call.message.edit_text(text, reply_markup=build_bank_menu(user_id))
+
+@dp.callback_query_handler(lambda c: c.data == 'bank_credits')
+async def cb_bank_credits(call: types.CallbackQuery):
+    """Меню вибору кредиту"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    active_credits = get_user_active_credits(user_id)
+    has_active_credit = len(active_credits) > 0
+    
+    if has_active_credit:
+        text = (
+            f"💰 <b>Взяття кредиту</b>\n\n"
+            f"❌ У вас вже є активний кредит!\n\n"
+            f"💡 Спочатку погасіть поточний кредит, щоб взяти новий."
+        )
+    else:
+        text = (
+            f"💰 <b>Взяття кредиту</b>\n\n"
+            f"💎 Ваш баланс: {get_user_coins(user_id):,} ✯\n"
+            f"🎯 Ваш рівень: {get_user_level(user_id)}\n"
+            f"📈 Ваш дохід: {get_total_passive_income(user_id)} ✯/6 год\n\n"
+            f"🏦 <b>Доступні кредити:</b>\n\n"
+            f"🟢 - можна взяти\n"
+            f"🔴 - потрібен вищий рівень\n\n"
+            f"💡 Кредит автоматично погашається з вашого доходу!"
+        )
+    
+    await call.message.edit_text(text, reply_markup=build_credits_menu(user_id))
+
+@dp.callback_query_handler(lambda c: c.data.startswith('credit_choose_'))
+async def cb_credit_choose(call: types.CallbackQuery):
+    """Вибір типу кредиту"""
+    await call.answer()
+    user_id = call.from_user.id
+    credit_type_id = int(call.data.split('_')[2])
+    
+    credit_type = next((ct for ct in CreditSystem.CREDIT_TYPES if ct["id"] == credit_type_id), None)
+    if not credit_type:
+        await call.answer("❌ Тип кредиту не знайдено!", show_alert=True)
+        return
+    
+    text = (
+        f"🏦 <b>{credit_type['name']}</b>\n\n"
+        f"📝 {credit_type['description']}\n\n"
+        f"💰 Максимальна сума: {credit_type['max_amount']:,} ✯\n"
+        f"📈 Відсоткова ставка: {credit_type['interest_rate']}%\n"
+        f"⏰ Термін: {credit_type['term_hours']} годин\n"
+        f"💎 Ваш баланс: {get_user_coins(user_id):,} ✯\n\n"
+        f"💡 <b>Введіть суму кредиту:</b>\n"
+        f"<code>/takecredit {credit_type_id} СУМА</code>\n\n"
+        f"📝 <b>Приклад:</b>\n"
+        f"<code>/takecredit {credit_type_id} 1000</code>\n"
+        f"<code>/takecredit {credit_type_id} 5000</code>"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("💰 Взяти максимальний", callback_data=f"credit_max_{credit_type_id}"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="bank_credits"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('credit_max_'))
+async def cb_credit_max(call: types.CallbackQuery):
+    """Взяття максимального кредиту"""
+    await call.answer()
+    user_id = call.from_user.id
+    credit_type_id = int(call.data.split('_')[2])
+    
+    credit_type = next((ct for ct in CreditSystem.CREDIT_TYPES if ct["id"] == credit_type_id), None)
+    if not credit_type:
+        await call.answer("❌ Тип кредиту не знайдено!", show_alert=True)
+        return
+    
+    max_amount = credit_type["max_amount"]
+    
+    if take_credit(user_id, credit_type_id, max_amount):
+        total_interest = calculate_credit_interest(max_amount, credit_type["interest_rate"], credit_type["term_hours"])
+        total_amount = max_amount + total_interest
+        
+        text = (
+            f"🎉 <b>Кредит успішно видано!</b>\n\n"
+            f"🏦 Тип: {credit_type['name']}\n"
+            f"💰 Сума: {max_amount:,} ✯\n"
+            f"📈 Відсотки: {total_interest:,} ✯\n"
+            f"💸 Загалом до сплати: {total_amount:,} ✯\n"
+            f"⏰ Термін: {credit_type['term_hours']} годин\n\n"
+            f"💎 Новий баланс: {get_user_coins(user_id):,} ✯\n\n"
+            f"💡 <b>Кредит автоматично погашатиметься з вашого доходу!</b>"
+        )
+        
+        kb = InlineKeyboardMarkup()
+        kb.add(InlineKeyboardButton("📊 Мої кредити", callback_data="bank_my_credits"))
+        kb.add(InlineKeyboardButton("⬅️ Головне", callback_data="bank_loans"))
+        
+        await call.message.edit_text(text, reply_markup=kb)
+    else:
+        await call.answer("❌ Не вдалося взяти кредит!", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data == 'bank_my_credits')
+async def cb_bank_my_credits(call: types.CallbackQuery):
+    """Мої кредити"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    active_credits = get_user_active_credits(user_id)
+    
+    if not active_credits:
+        text = (
+            f"📊 <b>Мої кредити</b>\n\n"
+            f"✅ У вас немає активних кредитів!\n\n"
+            f"💡 Почніть з взяття першого кредиту для розвитку."
+        )
+    else:
+        total_debt = sum(credit['remaining'] for credit in active_credits)
+        text = (
+            f"📊 <b>Мої кредити</b>\n\n"
+            f"💼 Активних кредитів: {len(active_credits)}\n"
+            f"💸 Загальний борг: {total_debt:,} ✯\n\n"
+            f"🎯 Оберіть кредит для деталей:"
+        )
+    
+    await call.message.edit_text(text, reply_markup=build_my_credits_menu(user_id))
+
+@dp.callback_query_handler(lambda c: c.data.startswith('credit_view_'))
+async def cb_credit_view(call: types.CallbackQuery):
+    """Перегляд деталей кредиту"""
+    await call.answer()
+    user_id = call.from_user.id
+    credit_id = int(call.data.split('_')[2])
+    
+    cursor.execute("""
+        SELECT uc.amount, uc.taken_date, uc.due_date, uc.remaining_amount, uc.status,
+               ct.name, ct.interest_rate, ct.term_hours
+        FROM user_credits uc
+        JOIN credit_types ct ON uc.credit_type = ct.id
+        WHERE uc.id = ? AND uc.user_id = ?
+    """, (credit_id, user_id))
+    
+    result = cursor.fetchone()
+    if not result:
+        await call.answer("❌ Кредит не знайдено!", show_alert=True)
+        return
+    
+    amount, taken_date, due_date, remaining, status, name, interest, term = result
+    
+    # Розраховуємо час до кінця
+    due_datetime = datetime.fromisoformat(due_date)
+    time_left = due_datetime - datetime.now()
+    hours_left = max(0, int(time_left.total_seconds() // 3600))
+    
+    # Розраховуємо щогодинну виплату
+    total_interest = calculate_credit_interest(amount, interest, term)
+    total_amount = amount + total_interest
+    hourly_payment = total_amount // term
+    
+    text = (
+        f"📊 <b>Деталі кредиту</b>\n\n"
+        f"🏦 Тип: {name}\n"
+        f"💰 Початкова сума: {amount:,} ✯\n"
+        f"📈 Відсоткова ставка: {interest}%\n"
+        f"💸 Залишок боргу: {remaining:,} ✯\n"
+        f"⏰ Залишилось: {hours_left} годин\n"
+        f"💳 Щогодинна виплата: {hourly_payment} ✯\n"
+        f"📅 Взяття: {taken_date[:16]}\n"
+        f"📅 Кінець: {due_date[:16]}\n\n"
+    )
+    
+    # Перевіряємо можливість дострокового погашення
+    check = can_repay_credit_early(user_id, credit_id)
+    if check["can"]:
+        text += f"🟢 Дострокове погашення: {check['amount']:,} ✯ (знижка {check['discount']:,} ✯)"
+    else:
+        text += f"🔴 {check['reason']}"
+    
+    kb = InlineKeyboardMarkup()
+    
+    if check["can"]:
+        kb.add(InlineKeyboardButton(f"💳 Виплатити ({check['amount']:,} ✯)", callback_data=f"credit_repay_{credit_id}"))
+    
+    kb.add(InlineKeyboardButton("📊 Мої кредити", callback_data="bank_my_credits"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="bank_loans"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'bank_repay')
+async def cb_bank_repay(call: types.CallbackQuery):
+    """Меню виплат кредитів"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    active_credits = get_user_active_credits(user_id)
+    
+    if not active_credits:
+        text = (
+            f"💳 <b>Виплата кредитів</b>\n\n"
+            f"✅ У вас немає активних кредитів!\n\n"
+            f"💡 Кредити автоматично погашаються з вашого доходу."
+        )
+    else:
+        text = (
+            f"💳 <b>Виплата кредитів</b>\n\n"
+            f"💎 Ваш баланс: {get_user_coins(user_id):,} ✯\n"
+            f"💼 Активних кредитів: {len(active_credits)}\n\n"
+            f"🟢 - можна виплатити достроково\n"
+            f"🔴 - недостатньо коштів\n\n"
+            f"💡 Дострокове погашення дає знижку 20% на відсотки!"
+        )
+    
+    await call.message.edit_text(text, reply_markup=build_repay_menu(user_id))
+
+@dp.callback_query_handler(lambda c: c.data.startswith('credit_repay_'))
+async def cb_credit_repay(call: types.CallbackQuery):
+    """Виплата кредиту достроково"""
+    await call.answer()
+    user_id = call.from_user.id
+    credit_id = int(call.data.split('_')[2])
+    
+    if repay_credit_early(user_id, credit_id):
+        text = (
+            f"🎉 <b>Кредит успішно погашено!</b>\n\n"
+            f"✅ Ви достроково погасили кредит\n"
+            f"💰 Знижка на відсотки: активована\n"
+            f"💎 Новий баланс: {get_user_coins(user_id):,} ✯\n\n"
+            f"🚀 Тепер ви можете взяти новий кредит!"
+        )
+        
+        kb = InlineKeyboardMarkup()
+        kb.add(InlineKeyboardButton("💰 Взяти кредит", callback_data="bank_credits"))
+        kb.add(InlineKeyboardButton("📋 Історія", callback_data="bank_history"))
+        kb.add(InlineKeyboardButton("⬅️ Головне", callback_data="bank_loans"))
+        
+        await call.message.edit_text(text, reply_markup=kb)
+    else:
+        await call.answer("❌ Не вдалося погасити кредит!", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data == 'bank_history')
+async def cb_bank_history(call: types.CallbackQuery):
+    """Історія кредитів"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    history = get_user_credit_history(user_id)
+    active_credits = get_user_active_credits(user_id)
+    
+    text = (
+        f"📋 <b>Історія кредитів</b>\n\n"
+        f"💼 Активних: {len(active_credits)} кредитів\n"
+        f"📊 Всього в історії: {len(history)} записів\n\n"
+    )
+    
+    if not history:
+        text += "📝 У вас ще не було кредитів.\n💡 Почніть з першого кредиту для розвитку!"
+    else:
+        text += "📅 <b>Останні кредити:</b>\n\n"
+        for i, credit in enumerate(history[:5], 1):  # Показуємо останні 5
+            status_emoji = "✅" if credit['status'] in ['paid', 'paid_early'] else "⏳" if credit['status'] == 'active' else "⚠️"
+            date = credit['taken_date'][:10]
+            text += f"{i}. {status_emoji} {credit['name']} - {credit['amount']:,} ✯ ({date})\n"
+    
+    kb = InlineKeyboardMarkup()
+    if not active_credits:
+        kb.add(InlineKeyboardButton("💰 Взяти кредит", callback_data="bank_credits"))
+    kb.add(InlineKeyboardButton("📊 Мої кредити", callback_data="bank_my_credits"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="bank_loans"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data in ['credit_has_active', 'credit_level_low', 'credit_cannot_repay'])
+async def cb_credit_errors(call: types.CallbackQuery):
+    """Обробники помилок кредитної системи"""
+    if call.data == 'credit_has_active':
+        await call.answer("❌ У вас вже є активний кредит!", show_alert=True)
+    elif call.data == 'credit_level_low':
+        await call.answer("🔴 Потрібен вищий рівень!", show_alert=True)
+    elif call.data == 'credit_cannot_repay':
+        await call.answer("❌ Недостатньо коштів для виплати!", show_alert=True)
+
+# ========== СИСТЕМА ЗАПИТІВ У ДРУЗІ - ФУНКЦІЇ ==========
+def send_friend_request(from_user_id: int, from_username: str, to_user_id: int) -> bool:
+    """Надіслати запит у друзі"""
+    # Перевіряємо чи не відправляємо самому собі
+    if from_user_id == to_user_id:
+        return False
+    
+    # Перевіряємо чи вже є запит
+    cursor.execute("""
+        SELECT id FROM friend_requests 
+        WHERE from_user_id = ? AND to_user_id = ? AND status = 'pending'
+    """, (from_user_id, to_user_id))
+    
+    if cursor.fetchone():
+        return False  # Вже є активний запит
+    
+    # Перевіряємо чи вже є в друзях
+    cursor.execute("SELECT id FROM friends WHERE user_id = ? AND friend_id = ?", (from_user_id, to_user_id))
+    if cursor.fetchone():
+        return False  # Вже в друзях
+    
+    # Створюємо запит
+    cursor.execute("""
+        INSERT INTO friend_requests (from_user_id, from_username, to_user_id, created_date)
+        VALUES (?, ?, ?, ?)
+    """, (from_user_id, from_username, to_user_id, datetime.now().isoformat()))
+    
+    conn.commit()
+    return True
+
+def get_pending_friend_requests(user_id: int) -> List[Dict]:
+    """Отримати запити у друзі для гравця"""
+    cursor.execute("""
+        SELECT fr.id, fr.from_user_id, fr.from_username, fr.created_date
+        FROM friend_requests fr
+        WHERE fr.to_user_id = ? AND fr.status = 'pending'
+        ORDER BY fr.created_date DESC
+    """, (user_id,))
+    
+    requests = []
+    for row in cursor.fetchall():
+        req_id, from_user_id, from_username, created_date = row
+        requests.append({
+            "id": req_id,
+            "from_user_id": from_user_id,
+            "from_username": from_username,
+            "created_date": created_date
+        })
+    return requests
+
+def get_friend_request_by_id(request_id: int, to_user_id: int) -> Optional[Dict]:
+    """Отримати запит у друзі з перевіркою отримувача"""
+    cursor.execute("""
+        SELECT id, from_user_id, from_username, to_user_id, status, created_date
+        FROM friend_requests 
+        WHERE id = ? AND to_user_id = ? AND status = 'pending'
+    """, (request_id, to_user_id))
+    
+    result = cursor.fetchone()
+    if not result:
+        return None
+    
+    return {
+        "id": result[0],
+        "from_user_id": result[1],
+        "from_username": result[2],
+        "to_user_id": result[3],
+        "status": result[4],
+        "created_date": result[5]
+    }
+
+def accept_friend_request(request_id: int, to_user_id: int) -> bool:
+    """Прийняти запит у друзі з перевіркою прав"""
+    try:
+        # Отримуємо запит з перевіркою отримувача
+        cursor.execute("""
+            SELECT id, from_user_id, from_username, to_user_id, status, created_date
+            FROM friend_requests 
+            WHERE id = ? AND to_user_id = ? AND status = 'pending'
+        """, (request_id, to_user_id))
+        
+        result = cursor.fetchone()
+        if not result:
+            print(f"❌ Запит {request_id} не знайдено або вже оброблено для користувача {to_user_id}")
+            return False
+        
+        request_id, from_user_id, from_username, to_user_id, status, created_date = result
+        
+        # Отримуємо username того хто прийняв запит
+        cursor.execute("SELECT username FROM players WHERE user_id = ?", (to_user_id,))
+        to_username_result = cursor.fetchone()
+        to_username = to_username_result[0] if to_username_result else f"User{to_user_id}"
+        
+        # Додаємо в друзі обом гравцям
+        try:
+            # Додаємо друга для того хто прийняв запит
+            cursor.execute(
+                "INSERT OR IGNORE INTO friends (user_id, friend_id, friend_username, added_date) VALUES (?, ?, ?, ?)",
+                (to_user_id, from_user_id, from_username, datetime.now().isoformat())
+            )
+            
+            # Додаємо друга для того хто надіслав запит
+            cursor.execute(
+                "INSERT OR IGNORE INTO friends (user_id, friend_id, friend_username, added_date) VALUES (?, ?, ?, ?)",
+                (from_user_id, to_user_id, to_username, datetime.now().isoformat())
+            )
+        except sqlite3.IntegrityError as e:
+            print(f"ℹ️ Гравці {from_user_id} і {to_user_id} вже друзі: {e}")
+        
+        # Оновлюємо статус запиту
+        cursor.execute("UPDATE friend_requests SET status = 'accepted' WHERE id = ?", (request_id,))
+        
+        conn.commit()
+        print(f"✅ Запит {request_id} прийнято - гравці {from_user_id} і {to_user_id} тепер друзі")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Помилка прийняття запиту {request_id}: {e}")
+        conn.rollback()
+        return False
+
+def reject_friend_request(request_id: int, to_user_id: int) -> bool:
+    """Відхилити запит у друзі з перевіркою прав"""
+    try:
+        # Перевіряємо чи запит належить користувачу
+        request = get_friend_request_by_id(request_id, to_user_id)
+        if not request:
+            print(f"❌ Запит {request_id} не знайдено для користувача {to_user_id}")
+            return False
+        
+        cursor.execute("UPDATE friend_requests SET status = 'rejected' WHERE id = ?", (request_id,))
+        conn.commit()
+        print(f"✅ Запит {request_id} відхилено користувачем {to_user_id}")
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"❌ Помилка відхилення запиту {request_id}: {e}")
+        return False
+
+# ========== СИСТЕМА ЗАПИТІВ У ДРУЗІ - ОБРОБНИКИ ==========
+@dp.callback_query_handler(lambda c: c.data == 'friends_requests')
+async def cb_friends_requests(call: types.CallbackQuery):
+    """Меню запитів у друзі"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    pending_requests = get_pending_friend_requests(user_id)
+    
+    if not pending_requests:
+        text = (
+            f"📨 <b>Запити у друзі</b>\n\n"
+            f"✅ У вас немає нових запитів!\n\n"
+            f"💡 Тут з'являться запити від інших гравців."
+        )
+        kb = InlineKeyboardMarkup()
+    else:
+        text = (
+            f"📨 <b>Запити у друзі</b>\n\n"
+            f"👥 У вас {len(pending_requests)} нових запитів:\n\n"
+            f"🎯 <b>Оберіть запит для перегляду:</b>"
+        )
+        
+        kb = InlineKeyboardMarkup(row_width=1)
+        for request in pending_requests:
+            kb.add(
+                InlineKeyboardButton(
+                    f"👤 {request['from_username']} (ID: {request['from_user_id']})", 
+                    callback_data=f"friend_request_view_{request['id']}"
+                )
+            )
+    
+    kb.add(InlineKeyboardButton("📋 Список друзів", callback_data="friends_list"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_friends"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+#990
+@dp.message_handler(commands=['debug_requests'])
+async def cmd_debug_requests(message: types.Message):
+    """Дебаг-команда для перевірки запитів"""
+    user_id = message.from_user.id
+    
+    cursor.execute("SELECT * FROM friend_requests WHERE to_user_id = ?", (user_id,))
+    requests = cursor.fetchall()
+    
+    text = f"🔧 <b>Дебаг запитів для {user_id}</b>\n\n"
+    
+    if not requests:
+        text += "❌ Немає запитів\n"
+    else:
+        for req in requests:
+            text += f"ID: {req[0]}, Від: {req[1]}, До: {req[3]}, Статус: {req[4]}\n"
+    
+    await message.answer(text)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('friend_request_view_'))
+async def cb_friend_request_view(call: types.CallbackQuery):
+    """Перегляд конкретного запиту у друзі"""
+    await call.answer()
+    user_id = call.from_user.id
+    request_id = int(call.data.split('_')[3])
+    
+    cursor.execute("""
+        SELECT fr.from_user_id, fr.from_username, fr.created_date, p.level, p.coins
+        FROM friend_requests fr
+        JOIN players p ON fr.from_user_id = p.user_id
+        WHERE fr.id = ? AND fr.to_user_id = ?
+    """, (request_id, user_id))
+    
+    result = cursor.fetchone()
+    if not result:
+        await call.answer("❌ Запит не знайдено!", show_alert=True)
+        return
+    
+    from_user_id, from_username, created_date, level, coins = result
+    
+    time_ago = datetime.now() - datetime.fromisoformat(created_date)
+    hours_ago = int(time_ago.total_seconds() // 3600)
+    
+    text = (
+        f"📨 <b>Запит у друзі</b>\n\n"
+        f"👤 Гравець: {from_username}\n"
+        f"🆔 ID: {from_user_id}\n"
+        f"🎯 Рівень: {level}\n"
+        f"💰 Баланс: {coins:,} ✯\n"
+        f"⏰ Надіслано: {hours_ago} год. тому\n\n"
+        f"🤝 Прийняти цей запит у друзі?"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("✅ Прийняти", callback_data=f"friend_accept_{request_id}"),
+        InlineKeyboardButton("❌ Відхилити", callback_data=f"friend_reject_{request_id}")
+    )
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="friends_requests"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('friend_accept_'))
+async def cb_friend_accept(call: types.CallbackQuery):
+    """Прийняти запит у друзі"""
+    user_id = call.from_user.id
+    request_id = int(call.data.split('_')[2])
+    
+    print(f"🔍 Спроба прийняти запит {request_id} від користувача {user_id}")
+    
+    # Отримуємо інформацію про запит
+    cursor.execute("SELECT from_user_id, from_username FROM friend_requests WHERE id = ? AND to_user_id = ? AND status = 'pending'", 
+                  (request_id, user_id))
+    result = cursor.fetchone()
+    
+    if not result:
+        await call.answer("❌ Запит не знайдено, вже оброблено або не для вас!", show_alert=True)
+        print(f"❌ Запит {request_id} не знайдено для користувача {user_id}")
+        return
+    
+    from_user_id, from_username = result
+    
+    if accept_friend_request(request_id, user_id):
+        # Оновлюємо повідомлення для того хто прийняв
+        try:
+            await call.message.edit_text(
+                f"✅ <b>ЗАПИТ ПРИЙНЯТО</b>\n\n"
+                f"🤝 Ви тепер друзі з {from_username}!\n\n"
+                f"🎉 Можете надсилати один одному гроші та спілкуватися!",
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("💰 Надіслати гроші", callback_data=f"friends_transfer_{from_user_id}"),
+                    InlineKeyboardButton("📋 Мої друзі", callback_data="friends_list")
+                )
+            )
+        except Exception as e:
+            print(f"❌ Помилка оновлення повідомлення: {e}")
+        
+        # Сповіщаємо того хто надіслав запит
+        try:
+            await bot.send_message(
+                from_user_id,
+                f"✅ <b>ВАШ ЗАПИТ ПРИЙНЯТО!</b>\n\n"
+                f"👤 {call.from_user.username or call.from_user.full_name} прийняв ваш запит у друзі.\n\n"
+                f"🎉 Тепер ви друзі!\n"
+                f"💬 Можете надсилати один одному гроші!",
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("💰 Надіслати гроші", callback_data=f"friends_transfer_{user_id}"),
+                    InlineKeyboardButton("📋 Мої друзі", callback_data="friends_list")
+                )
+            )
+        except Exception as e:
+            print(f"❌ Не вдалось сповістити {from_user_id}: {e}")
+        
+        await call.answer("✅ Запит прийнято! Ви тепер друзі!", show_alert=False)
+    else:
+        await call.answer("❌ Не вдалося прийняти запит!", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('friend_reject_'))
+async def cb_friend_reject(call: types.CallbackQuery):
+    """Відхилити запит у друзі"""
+    user_id = call.from_user.id
+    request_id = int(call.data.split('_')[2])
+    
+    print(f"🔍 Спроба відхилити запит {request_id} від користувача {user_id}")
+    
+    # Отримуємо інформацію про запит
+    cursor.execute("SELECT from_user_id, from_username FROM friend_requests WHERE id = ? AND to_user_id = ? AND status = 'pending'", 
+                  (request_id, user_id))
+    result = cursor.fetchone()
+    
+    if not result:
+        await call.answer("❌ Запит не знайдено або вже оброблено!", show_alert=True)
+        return
+    
+    from_user_id, from_username = result
+    
+    if reject_friend_request(request_id, user_id):
+        # Оновлюємо повідомлення для того хто відхилив
+        try:
+            await call.message.edit_text(
+                f"❌ <b>ЗАПИТ ВІДХИЛЕНО</b>\n\n"
+                f"👤 Ви відхилили запит від {from_username}.",
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("📨 Інші запити", callback_data="friends_requests"),
+                    InlineKeyboardButton("📋 Мої друзі", callback_data="friends_list")
+                )
+            )
+        except Exception as e:
+            print(f"❌ Помилка оновлення повідомлення: {e}")
+        
+        # Сповіщаємо того хто надіслав запит (необов'язково)
+        try:
+            await bot.send_message(
+                from_user_id,
+                f"❌ <b>ВАШ ЗАПИТ ВІДХИЛЕНО</b>\n\n"
+                f"👤 {call.from_user.username or call.from_user.full_name} відхилив ваш запит у друзі."
+            )
+        except:
+            pass  # Не вдалось відправити сповіщення
+        
+        await call.answer("❌ Запит відхилено!", show_alert=False)
+    else:
+        await call.answer("❌ Не вдалося відхилити запит!", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('friends_transfer_'))
+async def cb_friends_transfer_quick(call: types.CallbackQuery):
+    """Швидкий переказ грошей другу"""
+    await call.answer()
+    user_id = call.from_user.id
+    friend_id = int(call.data.split('_')[2])
+    
+    cursor.execute("SELECT username FROM players WHERE user_id = ?", (friend_id,))
+    friend_data = cursor.fetchone()
+    
+    if not friend_data:
+        await call.answer("❌ Гравець не знайдений!", show_alert=True)
+        return
+    
+    friend_username = friend_data[0]
+    
+    await call.message.answer(
+        f"💰 <b>Швидкий переказ другу</b>\n\n"
+        f"👤 Друг: {friend_username}\n"
+        f"🆔 ID: {friend_id}\n"
+        f"💎 Ваш баланс: {get_user_coins(user_id):,} ✯\n\n"
+        f"💡 <b>Введіть суму для переказу:</b>\n"
+        f"<code>/transfer {friend_id} СУМА</code>\n\n"
+        f"📝 <b>Приклад:</b>\n"
+        f"<code>/transfer {friend_id} 100</code>\n"
+        f"<code>/transfer {friend_id} 500</code>"
+    )
+
+def remove_friend(user_id: int, friend_id: int) -> bool:
+    """Видалити друга зі списку"""
+    try:
+        # Видаляємо з обох сторін
+        cursor.execute("DELETE FROM friends WHERE user_id = ? AND friend_id = ?", (user_id, friend_id))
+        cursor.execute("DELETE FROM friends WHERE user_id = ? AND friend_id = ?", (friend_id, user_id))
+        
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"❌ Помилка видалення друга: {e}")
+        return False
+
+def get_friend_info(user_id: int, friend_id: int) -> Dict:
+    """Отримати інформацію про друга"""
+    cursor.execute("""
+        SELECT f.friend_username, f.added_date, p.level, p.coins, p.role
+        FROM friends f
+        JOIN players p ON f.friend_id = p.user_id
+        WHERE f.user_id = ? AND f.friend_id = ?
+    """, (user_id, friend_id))
+    
+    result = cursor.fetchone()
+    if not result:
+        return None
+    
+    username, added_date, level, coins, role = result
+    return {
+        "username": username,
+        "added_date": added_date,
+        "level": level,
+        "coins": coins,
+        "role": role
+    }
 #------====== PASS =======-------
 def can_get_passport(user_id: int) -> Dict:
     level = get_user_level(user_id)
@@ -570,7 +2220,7 @@ async def check_passport_access(call: types.CallbackQuery):
     elif call.data == 'menu_income':
         await cb_menu_income(call)
     elif call.data == 'menu_friends':
-        await cb_menu_friends(call)
+        await cb_menu_friends(call)  # Це вже має бути виправлено вище
     elif call.data == 'inventory_view':
         await cb_inventory_view(call)
 
@@ -693,13 +2343,14 @@ def can_user_tap(user_id: int) -> bool:
 def get_total_passive_income(user_id: int) -> int:
     farm_income = get_user_farm_income(user_id)
     estate_income = get_user_real_estate_income(user_id)
+    business_income = get_total_business_income(user_id)
     
     # Додатковий дохід для Банкіра
     role = get_user_role(user_id)
     if role == "БАНКІР":
         estate_income += 25
     
-    return farm_income + estate_income
+    return farm_income + estate_income + business_income
 
 # Продовження в наступній частині...
 def get_user_friends(user_id: int) -> List[Dict]:
@@ -1047,20 +2698,6 @@ def get_user_inventory(user_id: int) -> List[Dict]:
         print(f"Помилка отримання інвентаря: {e}")
         return []
 
-
-#=============== FRIEND
-def send_friend_request(from_user_id: int, to_user_id: int) -> bool:
-    # Записуємо запит в окрему таблицю
-    pass
-
-def accept_friend_request(request_id: int) -> bool:
-    # Додаємо в друзі
-    pass
-
-def reject_friend_request(request_id: int) -> bool:
-    # Видаляємо запит
-    pass
-
 def remove_from_inventory(user_id: int, item_name: str) -> bool:
     """Видалити предмет з інвентаря"""
     # SQLite не підтримує LIMIT в DELETE, тому робимо так:
@@ -1201,6 +2838,26 @@ def buy_from_auction(user_id: int, item_id: int) -> bool:
     
     conn.commit()
     return True
+
+def add_to_inventory(user_id: int, item_name: str, item_price: int, item_type: str) -> bool:
+    """Додати предмет в інвентар"""
+    try:
+        # Перевіряємо кількість предметів в інвентарі
+        cursor.execute("SELECT COUNT(*) FROM user_inventory WHERE user_id = ?", (user_id,))
+        item_count = cursor.fetchone()[0]
+        
+        if item_count >= 10:
+            return False  # Інвентар переповнений
+        
+        # Додаємо предмет
+        cursor.execute(
+            "INSERT INTO user_inventory (user_id, item_name, item_price, item_type, obtained_date) VALUES (?, ?, ?, ?, ?)",
+            (user_id, item_name, item_price, item_type, datetime.now().isoformat())
+        )
+        return True
+    except Exception as e:
+        print(f"❌ Помилка додавання в інвентар: {e}")
+        return False
 
 def create_pending_sale(seller_id: int, buyer_id: int, item_name: str, item_type: str, price: int) -> bool:
     """Створити запропоновану продаж"""
@@ -1371,6 +3028,210 @@ def build_games_menu():
     )
     return kb
 
+# ========== БІЗНЕС СИСТЕМА - МЕНЮ ==========
+def build_business_menu(user_id: int):
+    """Побудувати меню бізнес-системи"""
+    kb = InlineKeyboardMarkup(row_width=2)
+    
+    kb.add(
+        InlineKeyboardButton("🏢 Мої бізнеси", callback_data="business_list"),
+        InlineKeyboardButton("🛍️ Купити бізнес", callback_data="business_buy")
+    )
+    kb.add(
+        InlineKeyboardButton("📊 Ліцензії", callback_data="business_licenses"),
+        InlineKeyboardButton("💰 Дохід", callback_data="business_income")
+    )
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_back|main"))
+    
+    return kb
+
+def build_business_list_menu(user_id: int, page: int = 1):
+    """Побудувати меню списку бізнесів"""
+    businesses = get_user_businesses(user_id)
+    items_per_page = 5
+    total_pages = (len(businesses) + items_per_page - 1) // items_per_page
+    start_idx = (page - 1) * items_per_page
+    end_idx = start_idx + items_per_page
+    page_businesses = businesses[start_idx:end_idx]
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    for business in page_businesses:
+        kb.add(InlineKeyboardButton(
+            f"🏢 {business['name']} (р.{business['level']}) - {business['income']}✯/6г",
+            callback_data=f"business_view_{business['id']}"
+        ))
+    
+    # Кнопки пагінації
+    pagination_buttons = []
+    if page > 1:
+        pagination_buttons.append(InlineKeyboardButton("◀️", callback_data=f"business_list_{page-1}"))
+    
+    if page < total_pages:
+        pagination_buttons.append(InlineKeyboardButton("▶️", callback_data=f"business_list_{page+1}"))
+    
+    if pagination_buttons:
+        kb.row(*pagination_buttons)
+    
+    kb.add(InlineKeyboardButton("🛍️ Купити бізнес", callback_data="business_buy"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_business"))
+    
+    return kb
+
+# ========== СИСТЕМА КРЕДИТІВ - МЕНЮ ==========
+def build_bank_menu(user_id: int):
+    """Побудувати меню банку"""
+    kb = InlineKeyboardMarkup(row_width=2)
+    
+    kb.add(
+        InlineKeyboardButton("💰 Взяти кредит", callback_data="bank_credits"),
+        InlineKeyboardButton("📊 Мої кредити", callback_data="bank_my_credits")
+    )
+    kb.add(
+        InlineKeyboardButton("💳 Виплатити", callback_data="bank_repay"),
+        InlineKeyboardButton("📋 Історія", callback_data="bank_history")
+    )
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_back|main"))
+    
+    return kb
+
+def build_credits_menu(user_id: int):
+    """Побудувати меню вибору кредиту"""
+    user_level = get_user_level(user_id)
+    active_credits = get_user_active_credits(user_id)
+    has_active_credit = len(active_credits) > 0
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    for credit_type in CreditSystem.CREDIT_TYPES:
+        if user_level >= credit_type["min_level"] and not has_active_credit:
+            button_text = f"{credit_type['name']} - до {credit_type['max_amount']:,} ✯"
+            callback_data = f"credit_choose_{credit_type['id']}"
+        elif has_active_credit:
+            button_text = f"🔴 {credit_type['name']} - є активний кредит"
+            callback_data = "credit_has_active"
+        else:
+            button_text = f"🔴 {credit_type['name']} - р. {credit_type['min_level']}+"
+            callback_data = "credit_level_low"
+        
+        kb.add(InlineKeyboardButton(button_text, callback_data=callback_data))
+    
+    if has_active_credit:
+        kb.add(InlineKeyboardButton("📊 Мої кредити", callback_data="bank_my_credits"))
+    
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="bank_loans"))
+    
+    return kb
+
+def build_my_credits_menu(user_id: int):
+    """Побудувати меню моїх кредитів"""
+    active_credits = get_user_active_credits(user_id)
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    if not active_credits:
+        kb.add(InlineKeyboardButton("💰 Взяти кредит", callback_data="bank_credits"))
+    else:
+        for credit in active_credits:
+            # Розраховуємо час до кінця
+            due_date = datetime.fromisoformat(credit['due_date'])
+            time_left = due_date - datetime.now()
+            hours_left = max(0, int(time_left.total_seconds() // 3600))
+            
+            button_text = f"{credit['name']} - {credit['remaining']:,} ✯ ({hours_left}г)"
+            kb.add(InlineKeyboardButton(button_text, callback_data=f"credit_view_{credit['id']}"))
+    
+    kb.add(InlineKeyboardButton("📋 Історія", callback_data="bank_history"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="bank_loans"))
+    
+    return kb
+
+def build_repay_menu(user_id: int):
+    """Побудувати меню виплат"""
+    active_credits = get_user_active_credits(user_id)
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    if not active_credits:
+        kb.add(InlineKeyboardButton("💰 Взяти кредит", callback_data="bank_credits"))
+    else:
+        for credit in active_credits:
+            check = can_repay_credit_early(user_id, credit['id'])
+            if check["can"]:
+                button_text = f"🟢 {credit['name']} - {check['amount']:,} ✯"
+                callback_data = f"credit_repay_{credit['id']}"
+            else:
+                button_text = f"🔴 {credit['name']} - {check['reason']}"
+                callback_data = "credit_cannot_repay"
+            
+            kb.add(InlineKeyboardButton(button_text, callback_data=callback_data))
+    
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="bank_loans"))
+    
+    return kb
+
+def build_business_buy_menu(user_id: int):
+    """Побудувати меню купівлі бізнесів"""
+    license_info = get_user_business_license(user_id)
+    user_businesses = get_user_businesses(user_id)
+    user_level = get_user_level(user_id)
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    for business in BusinessTypes.BUSINESSES:
+        can_buy = can_buy_business(user_id, business["id"])
+        has_business = any(b["type_id"] == business["id"] for b in user_businesses)
+        
+        if has_business:
+            count = get_business_type_count(user_id, business["id"])
+            button_text = f"✅ {business['name']} ({count}/2)"
+            callback_data = "business_already_owned"
+        elif user_level >= business["min_level"] and len(user_businesses) < license_info["max_businesses"]:
+            button_text = f"🟢 {business['name']} - {business['base_price']:,} ✯"
+            callback_data = f"business_buy_{business['id']}"
+        else:
+            button_text = f"🔴 {business['name']} - р.{business['min_level']}+"
+            callback_data = "business_cannot_buy"
+        
+        kb.add(InlineKeyboardButton(button_text, callback_data=callback_data))
+    
+    kb.add(InlineKeyboardButton("📊 Ліцензії", callback_data="business_licenses"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_business"))
+    
+    return kb
+
+def build_business_licenses_menu(user_id: int):
+    """Побудувати меню ліцензій"""
+    user_license = get_user_business_license(user_id)
+    user_businesses = get_user_businesses(user_id)
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    for license_data in BusinessLicenses.LICENSES:
+        if license_data["id"] == user_license["license_id"]:
+            # Поточна ліцензія
+            button_text = f"⭐ {license_data['name']} ({license_data['max_businesses']} біз.) - АКТИВНА"
+            callback_data = "license_current"
+        elif license_data["max_businesses"] > user_license["max_businesses"]:
+            # Краща ліцензія - можна купити
+            button_text = f"🟢 {license_data['name']} - {license_data['price']:,} ✯"
+            callback_data = f"license_buy_{license_data['id']}"
+        else:
+            # Гірша ліцензія - вже пройдено
+            button_text = f"✅ {license_data['name']} ({license_data['max_businesses']} біз.)"
+            callback_data = "license_owned"
+        
+        kb.add(InlineKeyboardButton(button_text, callback_data=callback_data))
+    
+    # Інформація про поточний стан
+    kb.add(InlineKeyboardButton(
+        f"📊 Поточний ліміт: {len(user_businesses)}/{user_license['max_businesses']}", 
+        callback_data="none"
+    ))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_business"))
+    
+    return kb
+
 def build_roulettes_menu():
     kb = InlineKeyboardMarkup(row_width=1)
     kb.add(
@@ -1411,6 +3272,7 @@ def build_shop_menu(user_id: int):
             InlineKeyboardButton("🎭 Ролі", callback_data="shop_roles"),
             InlineKeyboardButton("🏷️ Префікси", callback_data="shop_prefixes"),
             InlineKeyboardButton("🎯 Рівні", callback_data="shop_levels"),
+            InlineKeyboardButton("🛍️ Предмети", callback_data="shop_items"),  # НОВА КНОПКА
             InlineKeyboardButton("⬅️ Назад", callback_data="menu_back|main")
         )
     else:
@@ -1421,17 +3283,27 @@ def build_shop_menu(user_id: int):
     
     return kb
 
-def build_friends_menu():
+def build_friends_menu(user_id: int):
+    """Побудувати меню друзів"""
+    pending_requests = get_pending_friend_requests(user_id)
+    has_requests = len(pending_requests) > 0
+    
     kb = InlineKeyboardMarkup(row_width=1)
+    
+    if has_requests:
+        kb.add(InlineKeyboardButton(f"📨 Запити ({len(pending_requests)})", callback_data="friends_requests"))
+    
     kb.add(
         InlineKeyboardButton("📋 Список друзів", callback_data="friends_list"),
         InlineKeyboardButton("➕ Додати друга", callback_data="friends_add"),
         InlineKeyboardButton("💰 Надіслати гроші", callback_data="friends_transfer"),
-        InlineKeyboardButton("⬅️ Назад", callback_data="menu_profile")
+        InlineKeyboardButton("🗑️ Видалити друга", callback_data="friends_remove")  # НОВА КНОПКА
     )
+    
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_profile"))
+    
     return kb
 
-# Продовження в наступній частині...
 # ========== ОБРОБНИКИ КОМАНД ==========
 @dp.message_handler(commands=['start'])
 async def cmd_start(message: types.Message):
@@ -1580,6 +3452,420 @@ async def cmd_sell(message: types.Message):
         await message.answer("❌ Помилка! Перевірте правильність введених даних.")
     except Exception as e:
         await message.answer(f"❌ Помилка: {e}")
+
+
+# ========== БІЗНЕС СИСТЕМА - ОБРОБНИКИ ==========
+@dp.callback_query_handler(lambda c: c.data == 'menu_business')
+async def cb_menu_business(call: types.CallbackQuery):
+    """Головне меню бізнес-системи"""
+    await call.answer()
+    user_id = call.from_user.id
+    ensure_player(user_id, call.from_user.username or call.from_user.full_name)
+    
+    license_info = get_user_business_license(user_id)
+    user_businesses = get_user_businesses(user_id)
+    total_income = get_total_business_income(user_id)
+    
+    text = (
+        f"🏢 <b>Бізнес-Система</b>\n\n"
+        f"💼 Ваші бізнеси: {len(user_businesses)}/{license_info['max_businesses']}\n"
+        f"📄 Ліцензія: {license_info['name']}\n"
+        f"💰 Дохід: {total_income} ✯/6 год\n"
+        f"💎 Баланс: {get_user_coins(user_id)} ✯\n\n"
+        f"🚀 <b>Оберіть дію:</b>"
+    )
+    
+    await call.message.edit_text(text, reply_markup=build_business_menu(user_id))
+
+@dp.callback_query_handler(lambda c: c.data == 'business_list')
+async def cb_business_list(call: types.CallbackQuery):
+    """Список бізнесів гравця"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    businesses = get_user_businesses(user_id)
+    total_income = get_total_business_income(user_id)
+    
+    if not businesses:
+        text = (
+            f"🏢 <b>Ваші бізнеси</b>\n\n"
+            f"❌ У вас ще немає бізнесів!\n\n"
+            f"💡 Почніть з купівлі першого бізнесу в магазині."
+        )
+    else:
+        text = (
+            f"🏢 <b>Ваші бізнеси</b>\n\n"
+            f"📊 Всього бізнесів: {len(businesses)}\n"
+            f"💰 Загальний дохід: {total_income} ✯/6 год\n\n"
+            f"🎯 Оберіть бізнес для деталей:"
+        )
+    
+    await call.message.edit_text(text, reply_markup=build_business_list_menu(user_id))
+
+@dp.callback_query_handler(lambda c: c.data.startswith('business_list_'))
+async def cb_business_list_page(call: types.CallbackQuery):
+    """Пагінація списку бізнесів"""
+    await call.answer()
+    user_id = call.from_user.id
+    page = int(call.data.split('_')[2])
+    
+    businesses = get_user_businesses(user_id)
+    total_income = get_total_business_income(user_id)
+    
+    text = (
+        f"🏢 <b>Ваші бізнеси</b>\n\n"
+        f"📊 Всього бізнесів: {len(businesses)}\n"
+        f"💰 Загальний дохід: {total_income} ✯/6 год\n\n"
+        f"🎯 Оберіть бізнес для деталей:"
+    )
+    
+    await call.message.edit_text(text, reply_markup=build_business_list_menu(user_id, page))
+
+@dp.callback_query_handler(lambda c: c.data.startswith('business_view_'))
+async def cb_business_view(call: types.CallbackQuery):
+    """Перегляд деталей бізнесу"""
+    await call.answer()
+    user_id = call.from_user.id
+    business_id = int(call.data.split('_')[2])
+    
+    cursor.execute("""
+        SELECT ub.business_name, ub.level, ub.income, ub.purchased_date, bt.name, bt.max_level
+        FROM user_businesses ub
+        JOIN business_types bt ON ub.business_type = bt.id
+        WHERE ub.id = ? AND ub.user_id = ?
+    """, (business_id, user_id))
+    
+    result = cursor.fetchone()
+    if not result:
+        await call.answer("❌ Бізнес не знайдено!", show_alert=True)
+        return
+    
+    business_name, level, income, purchased_date, type_name, max_level = result
+    
+    # Розраховуємо наступне покращення
+    upgrade_check = can_upgrade_business(user_id, business_id)
+    upgrade_info = ""
+    if upgrade_check["can"]:
+        upgrade_info = f"🟢 Покращити до {level + 1} рівня: {upgrade_check['price']:,} ✯"
+    elif level < max_level:
+        upgrade_info = f"🔴 Покращення: {upgrade_check['reason']}"
+    else:
+        upgrade_info = "⭐ Максимальний рівень досягнуто!"
+    
+    text = (
+        f"🏢 <b>Деталі бізнесу</b>\n\n"
+        f"📝 Назва: {business_name}\n"
+        f"🎯 Тип: {type_name}\n"
+        f"⭐ Рівень: {level}/{max_level}\n"
+        f"💰 Дохід: {income} ✯/6 год\n"
+        f"📅 Куплено: {purchased_date[:10]}\n\n"
+        f"{upgrade_info}"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    
+    if upgrade_check["can"]:
+        kb.add(InlineKeyboardButton(f"⚡ Покращити ({upgrade_check['price']:,} ✯)", callback_data=f"business_upgrade_{business_id}"))
+    
+    kb.add(InlineKeyboardButton("📋 Список бізнесів", callback_data="business_list"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_business"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('business_upgrade_'))
+async def cb_business_upgrade(call: types.CallbackQuery):
+    """Покращити бізнес"""
+    await call.answer()
+    user_id = call.from_user.id
+    business_id = int(call.data.split('_')[2])
+    
+    if upgrade_business(user_id, business_id):
+        await call.answer("✅ Бізнес успішно покращено!", show_alert=True)
+        await cb_business_view(call)  # Повертаємось до перегляду
+    else:
+        await call.answer("❌ Не вдалося покращити бізнес!", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data == 'business_buy')
+async def cb_business_buy(call: types.CallbackQuery):
+    """Меню купівлі бізнесів"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    license_info = get_user_business_license(user_id)
+    user_businesses = get_user_businesses(user_id)
+    user_level = get_user_level(user_id)
+    
+    text = (
+        f"🛍️ <b>Купівля бізнесу</b>\n\n"
+        f"💼 Ваші бізнеси: {len(user_businesses)}/{license_info['max_businesses']}\n"
+        f"💎 Баланс: {get_user_coins(user_id):,} ✯\n"
+        f"🎯 Ваш рівень: {user_level}\n\n"
+        f"🏢 <b>Доступні бізнеси:</b>\n\n"
+        f"🟢 - можна купити\n"
+        f"🔴 - потрібен вищий рівень\n"
+        f"✅ - вже є у власності\n\n"
+        f"💡 Максимум 2 бізнеси одного типу!"
+    )
+    
+    await call.message.edit_text(text, reply_markup=build_business_buy_menu(user_id))
+
+@dp.callback_query_handler(lambda c: c.data.startswith('business_buy_'))
+async def cb_business_buy_confirm(call: types.CallbackQuery):
+    """Підтвердження купівлі бізнесу"""
+    await call.answer()
+    user_id = call.from_user.id
+    business_type_id = int(call.data.split('_')[2])
+    
+    business = next((b for b in BusinessTypes.BUSINESSES if b["id"] == business_type_id), None)
+    if not business:
+        await call.answer("❌ Бізнес не знайдено!", show_alert=True)
+        return
+    
+    check = can_buy_business(user_id, business_type_id)
+    if not check["can"]:
+        await call.answer(check["reason"], show_alert=True)
+        return
+    
+    text = (
+        f"🏢 <b>Підтвердження покупки</b>\n\n"
+        f"📝 Бізнес: {business['name']}\n"
+        f"💰 Ціна: {business['base_price']:,} ✯\n"
+        f"💎 Ваш баланс: {get_user_coins(user_id):,} ✯\n"
+        f"💰 Дохід: {business['base_income']} ✯/6 год\n"
+        f"⭐ Макс. рівень: {business['max_level']}\n\n"
+        f"💡 Бізнес можна буде покращувати для збільшення доходу!"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("✅ Купити", callback_data=f"business_confirm_{business_type_id}"))
+    kb.add(InlineKeyboardButton("❌ Скасувати", callback_data="business_buy"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('business_confirm_'))
+async def cb_business_confirm(call: types.CallbackQuery):
+    """Підтверджена купівля бізнесу"""
+    await call.answer()
+    user_id = call.from_user.id
+    business_type_id = int(call.data.split('_')[2])
+    
+    if buy_business(user_id, business_type_id):
+        business = next((b for b in BusinessTypes.BUSINESSES if b["id"] == business_type_id), None)
+        
+        text = (
+            f"🎉 <b>Бізнес успішно куплено!</b>\n\n"
+            f"🏢 Назва: {business['name']}\n"
+            f"💰 Витрачено: {business['base_price']:,} ✯\n"
+            f"💎 Новий баланс: {get_user_coins(user_id):,} ✯\n"
+            f"📈 Дохід: {business['base_income']} ✯/6 год\n\n"
+            f"⚡ Тепер ви можете покращувати бізнес для збільшення доходу!"
+        )
+        
+        kb = InlineKeyboardMarkup()
+        kb.add(InlineKeyboardButton("🏢 Мої бізнеси", callback_data="business_list"))
+        kb.add(InlineKeyboardButton("🛍️ Ще бізнес", callback_data="business_buy"))
+        kb.add(InlineKeyboardButton("⬅️ Головне", callback_data="menu_business"))
+        
+        await call.message.edit_text(text, reply_markup=kb)
+    else:
+        await call.answer("❌ Не вдалося купити бізнес!", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data == 'business_already_owned')
+async def cb_business_already_owned(call: types.CallbackQuery):
+    """Повідомлення про вже наявний бізнес"""
+    await call.answer("❌ У вас вже є цей тип бізнесу! (макс. 2 одного типу)", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data == 'business_cannot_buy')
+async def cb_business_cannot_buy(call: types.CallbackQuery):
+    """Повідомлення про неможливість купівлі"""
+    await call.answer("🔴 Цей бізнес ще не доступний! Потрібен вищий рівень.", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data == 'business_licenses')
+async def cb_business_licenses(call: types.CallbackQuery):
+    """Меню ліцензій"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    user_license = get_user_business_license(user_id)
+    user_businesses = get_user_businesses(user_id)
+    
+    text = (
+        f"📊 <b>Система ліцензій</b>\n\n"
+        f"💼 Поточний ліміт: {len(user_businesses)}/{user_license['max_businesses']} бізнесів\n"
+        f"📄 Ваша ліцензія: {user_license['name']}\n"
+        f"💎 Баланс: {get_user_coins(user_id):,} ✯\n\n"
+        f"🏢 <b>Доступні ліцензії:</b>\n\n"
+        f"⭐ - ваша поточна ліцензія\n"
+        f"🟢 - можна купити\n"
+        f"✅ - вже є краща ліцензія\n\n"
+        f"💡 Можна купувати будь-яку ліцензію!"
+    )
+    
+    await call.message.edit_text(text, reply_markup=build_business_licenses_menu(user_id))
+
+@dp.callback_query_handler(lambda c: c.data == 'refresh_licenses')
+async def cb_refresh_licenses(call: types.CallbackQuery):
+    """Оновити меню ліцензій"""
+    await call.answer("🔄 Меню оновлено!")
+    
+    user_id = call.from_user.id
+    user_license = get_user_business_license(user_id)
+    user_businesses = get_user_businesses(user_id)
+    
+    # Створюємо НОВИЙ текст
+    text = (
+        f"📊 <b>Система ліцензій</b>\n\n"
+        f"💼 Поточний ліміт: {len(user_businesses)}/{user_license['max_businesses']} бізнесів\n"
+        f"📄 Ваша ліцензія: {user_license['name']}\n"
+        f"💎 Баланс: {get_user_coins(user_id):,} ✯\n\n"
+        f"🏢 <b>Доступні ліцензії:</b>\n\n"
+        f"✅ - вже куплено\n"
+        f"🟢 - можна купити\n"
+        f"🔴 - потрібна попередня ліцензія\n\n"
+        f"💡 Ліцензії купуються по черзі!"
+    )
+    
+    # Створюємо НОВУ клавіатуру
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    for license_data in BusinessLicenses.LICENSES:
+        if license_data["id"] < user_license["license_id"]:
+            button_text = f"✅ {license_data['name']} ({license_data['max_businesses']} біз.)"
+            callback_data = "license_already_owned"
+        elif license_data["id"] == user_license["license_id"]:
+            button_text = f"🟢 {license_data['name']} - {license_data['price']:,} ✯"
+            callback_data = f"license_buy_{license_data['id']}"
+        else:
+            prev_license = next((l for l in BusinessLicenses.LICENSES if l["id"] == license_data["id"] - 1), None)
+            if prev_license:
+                button_text = f"🔴 {license_data['name']} - купіть {prev_license['name']}"
+            else:
+                button_text = f"🔴 {license_data['name']} - потрібна попередня"
+            callback_data = "license_cannot_buy"
+        
+        kb.add(InlineKeyboardButton(button_text, callback_data=callback_data))
+    
+    kb.add(InlineKeyboardButton(
+        f"📊 Поточний ліміт: {len(user_businesses)}/{user_license['max_businesses']}", 
+        callback_data="none"
+    ))
+    kb.add(InlineKeyboardButton("🔄 Оновити", callback_data="refresh_licenses"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_business"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('license_buy_'))
+async def cb_license_buy(call: types.CallbackQuery):
+    """Купівля ліцензії"""
+    await call.answer()
+    user_id = call.from_user.id
+    license_id = int(call.data.split('_')[2])
+    
+    license_data = next((l for l in BusinessLicenses.LICENSES if l["id"] == license_id), None)
+    
+    if not license_data:
+        await call.answer("❌ Ліцензія не знайдена!", show_alert=True)
+        return
+    
+    user_license = get_user_business_license(user_id)
+    
+    # Перевіряємо чи це не поточна ліцензія
+    if license_id == user_license["license_id"]:
+        await call.answer("✅ Ця ліцензія вже активна!", show_alert=True)
+        return
+    
+    # Перевіряємо чи це не гірша ліцензія
+    if license_data["max_businesses"] <= user_license["max_businesses"]:
+        await call.answer("❌ У вас вже є краща ліцензія!", show_alert=True)
+        return
+    
+    user_coins = get_user_coins(user_id)
+    if user_coins < license_data["price"]:
+        await call.answer(f"❌ Недостатньо монет! Потрібно {license_data['price']:,} ✯", show_alert=True)
+        return
+    
+    # Купуємо ліцензію
+    cursor.execute("""
+        UPDATE user_business_licenses 
+        SET license_id = ?, max_businesses = ?, purchased_date = ?
+        WHERE user_id = ?
+    """, (license_id, license_data["max_businesses"], datetime.now().isoformat(), user_id))
+    
+    # Списуємо монети
+    cursor.execute("UPDATE players SET coins = coins - ? WHERE user_id = ?", 
+                   (license_data["price"], user_id))
+    
+    conn.commit()
+    
+    text = (
+        f"🎉 <b>Ліцензію успішно куплено!</b>\n\n"
+        f"📄 Ліцензія: {license_data['name']}\n"
+        f"💼 Новий ліміт: {license_data['max_businesses']} бізнесів\n"
+        f"💰 Витрачено: {license_data['price']:,} ✯\n"
+        f"💎 Новий баланс: {get_user_coins(user_id):,} ✯\n\n"
+        f"🚀 Тепер ви можете мати більше бізнесів!"
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("🛍️ Купити бізнес", callback_data="business_buy"))
+    kb.add(InlineKeyboardButton("📊 Перейти до ліцензій", callback_data="business_licenses"))
+    kb.add(InlineKeyboardButton("⬅️ Головне", callback_data="menu_business"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data == 'license_current')
+async def cb_license_current(call: types.CallbackQuery):
+    """Поточна ліцензія"""
+    await call.answer("⭐ Ця ліцензія вже активна!", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data == 'license_owned')
+async def cb_license_owned(call: types.CallbackQuery):
+    """Вже є краща ліцензія"""
+    await call.answer("✅ У вас вже є краща ліцензія!", show_alert=True)
+
+
+
+@dp.callback_query_handler(lambda c: c.data == 'license_already_owned')
+async def cb_license_already_owned(call: types.CallbackQuery):
+    """Повідомлення про вже наявну ліцензію"""
+    await call.answer("✅ Ця ліцензія вже куплена!", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data == 'license_cannot_buy')
+async def cb_license_cannot_buy(call: types.CallbackQuery):
+    """Повідомлення про неможливість купівлі ліцензії"""
+    await call.answer("🔴 Спочатку купіть попередню ліцензію!", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data == 'business_income')
+async def cb_business_income(call: types.CallbackQuery):
+    """Інформація про дохід від бізнесів"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    businesses = get_user_businesses(user_id)
+    total_income = get_total_business_income(user_id)
+    
+    text = (
+        f"💰 <b>Дохід від бізнесів</b>\n\n"
+        f"📊 Всього бізнесів: {len(businesses)}\n"
+        f"💸 Загальний дохід: {total_income} ✯/6 год\n\n"
+    )
+    
+    if businesses:
+        text += "🏢 <b>Ваші бізнеси:</b>\n"
+        for business in businesses:
+            text += f"• {business['name']} (р.{business['level']}): {business['income']} ✯/6 год\n"
+        
+        text += f"\n💡 Дохід нараховується автоматично кожні 6 годин!"
+    else:
+        text += "❌ У вас ще немає бізнесів!\n\n💡 Почніть з купівлі першого бізнесу."
+    
+    kb = InlineKeyboardMarkup()
+    if businesses:
+        kb.add(InlineKeyboardButton("📋 Список бізнесів", callback_data="business_list"))
+    kb.add(InlineKeyboardButton("🛍️ Купити бізнес", callback_data="business_buy"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_business"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
 
 # ========== ОСНОВНІ ОБРОБНИКИ МЕНЮ ==========
 @dp.callback_query_handler(lambda c: c.data == 'menu_games')
@@ -1738,16 +4024,165 @@ async def cb_menu_roulettes(call: types.CallbackQuery):
 @dp.callback_query_handler(lambda c: c.data == 'menu_friends')
 async def cb_menu_friends(call: types.CallbackQuery):
     await call.answer()
+    user_id = call.from_user.id
+    ensure_player(user_id, call.from_user.username or call.from_user.full_name)
+    
     text = (
         "👥 <b>Система друзів</b>\n\n"
         "📊 <b>Функції:</b>\n"
         "• Додавайте друзів за ID\n"
         "• Надсилайте монети друзям\n"
-        "• Переглядайте список друзів\n\n"
-        "💡 <b>Порада:</b> ID друга можна дізнатись з його профілю"
+        "• Переглядайте список друзів\n"
+        "• Приймайте запити у друзі\n\n"
+        "💡 <b>Новинка:</b> Система запитів у друзі як у соцмережах!"
     )
     
-    await call.message.edit_text(text, reply_markup=build_friends_menu())
+    await call.message.edit_text(text, reply_markup=build_friends_menu(user_id))  # ДОДАВ user_id
+
+def build_remove_friends_menu(user_id: int, page: int = 1):
+    """Побудувати меню видалення друзів"""
+    friends = get_user_friends(user_id)
+    items_per_page = 5
+    total_pages = (len(friends) + items_per_page - 1) // items_per_page
+    start_idx = (page - 1) * items_per_page
+    end_idx = start_idx + items_per_page
+    page_friends = friends[start_idx:end_idx]
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    for friend in page_friends:
+        kb.add(InlineKeyboardButton(
+            f"👤 {friend['username']}",
+            callback_data=f"friend_remove_{friend['user_id']}"
+        ))
+    
+    # Кнопки пагінації
+    pagination_buttons = []
+    if page > 1:
+        pagination_buttons.append(InlineKeyboardButton("◀️", callback_data=f"friends_remove_{page-1}"))
+    
+    if page < total_pages:
+        pagination_buttons.append(InlineKeyboardButton("▶️", callback_data=f"friends_remove_{page+1}"))
+    
+    if pagination_buttons:
+        kb.row(*pagination_buttons)
+    
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_friends"))
+    
+    return kb
+@dp.callback_query_handler(lambda c: c.data == 'friends_remove')
+async def cb_friends_remove(call: types.CallbackQuery):
+    """Меню видалення друзів"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    friends = get_user_friends(user_id)
+    
+    if not friends:
+        text = (
+            f"🗑️ <b>Видалення друзів</b>\n\n"
+            f"✅ У вас немає друзів для видалення!\n\n"
+            f"💡 Спочатку додайте друзів."
+        )
+    else:
+        text = (
+            f"🗑️ <b>Видалення друзів</b>\n\n"
+            f"👥 У вас {len(friends)} друзів\n\n"
+            f"⚠️ <b>Оберіть друга для видалення:</b>\n\n"
+            f"🔴 Ця дія незворотня! Друга буде видалено з обох списків."
+        )
+    
+    await call.message.edit_text(text, reply_markup=build_remove_friends_menu(user_id))
+
+@dp.callback_query_handler(lambda c: c.data.startswith('friends_remove_'))
+async def cb_friends_remove_page(call: types.CallbackQuery):
+    """Пагінація меню видалення друзів"""
+    await call.answer()
+    user_id = call.from_user.id
+    page = int(call.data.split('_')[2])
+    
+    friends = get_user_friends(user_id)
+    
+    text = (
+        f"🗑️ <b>Видалення друзів</b>\n\n"
+        f"👥 У вас {len(friends)} друзів\n\n"
+        f"⚠️ <b>Оберіть друга для видалення:</b>\n\n"
+        f"🔴 Ця дія незворотня! Друга буде видалено з обох списків."
+    )
+    
+    await call.message.edit_text(text, reply_markup=build_remove_friends_menu(user_id, page))
+
+@dp.callback_query_handler(lambda c: c.data.startswith('friend_remove_'))
+async def cb_friend_remove_confirm(call: types.CallbackQuery):
+    """Підтвердження видалення друга"""
+    await call.answer()
+    user_id = call.from_user.id
+    friend_id = int(call.data.split('_')[2])
+    
+    friend_info = get_friend_info(user_id, friend_id)
+    
+    if not friend_info:
+        await call.answer("❌ Друг не знайдений!", show_alert=True)
+        return
+    
+    text = (
+        f"🗑️ <b>ПІДТВЕРДЖЕННЯ ВИДАЛЕННЯ</b>\n\n"
+        f"👤 Друг: {friend_info['username']}\n"
+        f"🆔 ID: {friend_id}\n"
+        f"🎯 Рівень: {friend_info['level']}\n"
+        f"💰 Баланс: {friend_info['coins']:,} ✯\n"
+        f"🎭 Роль: {friend_info['role']}\n"
+        f"📅 Додано: {friend_info['added_date'][:10]}\n\n"
+        f"⚠️ <b>Ви впевнені, що хочете видалити цього друга?</b>\n\n"
+        f"🔴 Ця дія незворотня! Ви не зможете надсилати гроші цьому гравцю."
+    )
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(
+        InlineKeyboardButton("✅ Так, видалити", callback_data=f"friend_confirm_remove_{friend_id}"),
+        InlineKeyboardButton("❌ Скасувати", callback_data="friends_remove")
+    )
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('friend_confirm_remove_'))
+async def cb_friend_confirm_remove(call: types.CallbackQuery):
+    """Підтверджене видалення друга"""
+    await call.answer()
+    user_id = call.from_user.id
+    friend_id = int(call.data.split('_')[3])
+    
+    friend_info = get_friend_info(user_id, friend_id)
+    
+    if not friend_info:
+        await call.answer("❌ Друг не знайдений!", show_alert=True)
+        return
+    
+    if remove_friend(user_id, friend_id):
+        text = (
+            f"✅ <b>ДРУГА ВИДАЛЕНО</b>\n\n"
+            f"👤 {friend_info['username']} був видалений з вашого списку друзів.\n\n"
+            f"💔 Ви більше не будете друзями в системі."
+        )
+        
+        # Сповіщаємо друга про видалення (необов'язково)
+        try:
+            await bot.send_message(
+                friend_id,
+                f"💔 <b>ВИ ВИДАЛЕНІ З ДРУЗІВ</b>\n\n"
+                f"👤 {call.from_user.username or call.from_user.full_name} видалив вас зі списку друзів."
+            )
+        except:
+            pass  # Не вдалось відправити сповіщення
+        
+    else:
+        text = "❌ Не вдалося видалити друга!"
+    
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("📋 Список друзів", callback_data="friends_list"))
+    kb.add(InlineKeyboardButton("⬅️ Меню друзів", callback_data="menu_friends"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
 
 @dp.callback_query_handler(lambda c: c.data.startswith('menu_back|'))
 async def cb_menu_back(call: types.CallbackQuery):
@@ -3253,15 +5688,24 @@ async def cb_menu_item_roulette(call: types.CallbackQuery):
 
 @dp.callback_query_handler(lambda c: c.data == 'item_roulette_spin')
 async def cb_item_roulette_spin(call: types.CallbackQuery):
+    """Крутіння рулетки предметів"""
     await call.answer()
     user_id = call.from_user.id
     
-    if get_user_coins(user_id) < 200:
-        await call.answer("❌ Недостатньо монет!", show_alert=True)
+    # Перевірка рівня (5+ для рулетки предметів)
+    user_level = get_user_level(user_id)
+    if user_level < 5:
+        await call.answer("❌ Рулетка предметів доступна з 5 рівня!", show_alert=True)
         return
     
+    if get_user_coins(user_id) < 200:
+        await call.answer("❌ Недостатньо монет! Потрібно 200 ✯", show_alert=True)
+        return
+    
+    # Списуємо монети
     cursor.execute("UPDATE players SET coins = coins - 200 WHERE user_id = ?", (user_id,))
     
+    # Випадковий вибір призу
     r = random.random()
     cumulative_probability = 0.0
     
@@ -3306,6 +5750,7 @@ async def cb_item_roulette_spin(call: types.CallbackQuery):
             await call.message.edit_text(text, reply_markup=kb)
             return
     
+    # Якщо жоден предмет не вибрано (малоймовірно, але на всяк випадок)
     await call.answer("❌ Помилка рулетки", show_alert=True)
 
 # Продовження в наступній частині...
@@ -3522,6 +5967,272 @@ async def cb_bank_collect(call: types.CallbackQuery):
 
 # Продовження в наступній частині...
 # ========== МАГАЗИН ==========
+# ========== МАГАЗИН ПРЕДМЕТІВ ==========
+
+@dp.callback_query_handler(lambda c: c.data == 'shop_items')
+async def cb_shop_items(call: types.CallbackQuery):
+    """Магазин предметів"""
+    await call.answer()
+    user_id = call.from_user.id
+    ensure_player(user_id, call.from_user.username or call.from_user.full_name)
+    
+    user_coins = get_user_coins(user_id)
+    
+    text = (
+        f"🛍️ <b>Магазин предметів</b>\n\n"
+        f"💎 Ваш баланс: {user_coins} ✯\n\n"
+        f"📦 <b>Категорії предметів:</b>\n"
+        f"• ⛏️ Мінерали та руди\n"
+        f"• 🔮 Магічні предмети\n"
+        f"• ⚔️ Зброя та обладунки\n"
+        f"• 🚗 Автозапчастини\n"
+        f"• 🧪 Зілля та еліксири\n\n"
+        f"💡 Купляйте предмети для крафтингу та колекціонування!"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("⛏️ Мінерали", callback_data="shop_category_mineral"),
+        InlineKeyboardButton("🔮 Магія", callback_data="shop_category_magic"),
+        InlineKeyboardButton("⚔️ Зброя", callback_data="shop_category_weapon"),
+        InlineKeyboardButton("🚗 Автозапчастини", callback_data="shop_category_car_part"),
+        InlineKeyboardButton("🧪 Зілля", callback_data="shop_category_potion")
+    )
+    kb.add(InlineKeyboardButton("🛠️ Крафтинг", callback_data="crafting_menu"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_shop"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('shop_category_'))
+async def cb_shop_category(call: types.CallbackQuery):
+    """Показ предметів по категорії"""
+    await call.answer()
+    user_id = call.from_user.id
+    category = call.data.replace('shop_category_', '')
+    
+    user_coins = get_user_coins(user_id)
+    category_names = {
+        'mineral': '⛏️ Мінерали та руди',
+        'magic': '🔮 Магічні предмети', 
+        'weapon': '⚔️ Зброя та обладунки',
+        'car_part': '🚗 Автозапчастини',
+        'potion': '🧪 Зілля та еліксири'
+    }
+    
+    category_items = ITEMS_BY_CATEGORY.get(category, [])
+    
+    text = (
+        f"🛍️ <b>{category_names.get(category, 'Предмети')}</b>\n\n"
+        f"💎 Ваш баланс: {user_coins} ✯\n\n"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    
+    if not category_items:
+        text += "❌ Наразі немає предметів у цій категорії!"
+    else:
+        for item in category_items:
+            can_buy = user_coins >= item['price']
+            emoji = "✅" if can_buy else "❌"
+            
+            text += f"{emoji} {item['name']} - {item['price']} ✯ (ID: {item['id']})\n"
+            
+            if can_buy:
+                kb.insert(InlineKeyboardButton(
+                    f"{item['name']} - {item['price']}✯",
+                    callback_data=f"buy_item_{item['id']}"
+                ))
+            else:
+                kb.insert(InlineKeyboardButton(
+                    f"❌ {item['price']}✯",
+                    callback_data="cannot_buy_item"
+                ))
+    
+    kb.add(InlineKeyboardButton("📦 Всі категорії", callback_data="shop_items"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_shop"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('buy_item_'))
+async def cb_buy_item(call: types.CallbackQuery):
+    """Купівля предмета з магазину"""
+    await call.answer()
+    user_id = call.from_user.id
+    item_id = int(call.data.replace('buy_item_', ''))
+    
+    # Знаходимо предмет в магазині
+    shop_item = next((item for item in ItemShop.ITEMS if item['id'] == item_id), None)
+    if not shop_item:
+        await call.answer("❌ Предмет не знайдено в магазині!", show_alert=True)
+        return
+    
+    user_coins = get_user_coins(user_id)
+    if user_coins < shop_item['price']:
+        await call.answer("❌ Недостатньо монет для покупки!", show_alert=True)
+        return
+    
+    # Знаходимо повну інформацію про предмет
+    item_info = ITEM_BY_ID.get(item_id)
+    if not item_info:
+        await call.answer("❌ Інформація про предмет не знайдена!", show_alert=True)
+        return
+    
+    # Перевіряємо місце в інвентарі
+    user_items = get_user_inventory(user_id)
+    if len(user_items) >= 10:
+        await call.answer("❌ Інвентар переповнений! (макс. 10 предметів)", show_alert=True)
+        return
+    
+    # Купівля предмета
+    cursor.execute("UPDATE players SET coins = coins - ? WHERE user_id = ?", 
+                   (shop_item['price'], user_id))
+    
+    # Додаємо предмет в інвентар
+    if add_to_inventory(user_id, item_info['name'], item_info['price'], item_info['type']):
+        conn.commit()
+        await call.answer(f"✅ Куплено {item_info['name']} за {shop_item['price']} ✯!", show_alert=True)
+        
+        # Повертаємось до магазину
+        await cb_shop_items(call)
+    else:
+        await call.answer("❌ Помилка при додаванні предмета в інвентар!", show_alert=True)
+
+@dp.callback_query_handler(lambda c: c.data == 'cannot_buy_item')
+async def cb_cannot_buy_item(call: types.CallbackQuery):
+    """Недостатньо монет для покупки"""
+    await call.answer("❌ Недостатньо монет для покупки!", show_alert=True)
+
+# ========== ПОКРАЩЕНИЙ КРАФТИНГ ==========
+
+@dp.callback_query_handler(lambda c: c.data == 'crafting_menu')
+async def cb_crafting_menu(call: types.CallbackQuery):
+    """Покращене меню крафтингу"""
+    await call.answer()
+    user_id = call.from_user.id
+    
+    # Перевіряємо рівень
+    user_level = get_user_level(user_id)
+    if user_level < 5:
+        await call.answer("❌ Крафт доступний з 5 рівня!", show_alert=True)
+        return
+    
+    user_coins = get_user_coins(user_id)
+    craftable_items = get_user_craftable_items(user_id)
+    
+    text = (
+        f"🛠️ <b>Мастерня крафту</b>\n\n"
+        f"💎 Баланс: {user_coins} ✯\n"
+        f"🎯 Ваш рівень: {user_level}\n"
+        f"📦 Доступно рецептів: {len([c for c in craftable_items if c['can_craft']])}/{len(craftable_items)}\n\n"
+        f"📋 <b>Категорії рецептів:</b>\n"
+    )
+    
+    # Групуємо рецепти по категоріям
+    categories = {
+        "jewelry": "💎 Ювелірні вироби",
+        "weapon": "⚔️ Зброя", 
+        "magic": "🔮 Магічні предмети",
+        "potion": "🧪 Зілля",
+        "car": "🚗 Транспорт",
+        "legendary": "🌟 Легендарні предмети"
+    }
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    
+    for category_id, category_name in categories.items():
+        category_recipes = [c for c in craftable_items if c['recipe'].get('result_type') == category_id]
+        available_count = len([c for c in category_recipes if c['can_craft']])
+        
+        emoji = "✅" if available_count > 0 else "⏳"
+        kb.insert(InlineKeyboardButton(
+            f"{emoji} {category_name}",
+            callback_data=f"crafting_category_{category_id}"
+        ))
+    
+    kb.add(InlineKeyboardButton("📦 Мій інвентар", callback_data="inventory_view"))
+    kb.add(InlineKeyboardButton("🛍️ Магазин предметів", callback_data="shop_items"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="inventory_view"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+
+@dp.callback_query_handler(lambda c: c.data.startswith('crafting_category_'))
+async def cb_crafting_category(call: types.CallbackQuery):
+    """Крафтинг по категорії"""
+    await call.answer()
+    user_id = call.from_user.id
+    category = call.data.replace('crafting_category_', '')
+    
+    user_coins = get_user_coins(user_id)
+    craftable_items = get_user_craftable_items(user_id)
+    
+    category_names = {
+        "jewelry": "💎 Ювелірні вироби",
+        "weapon": "⚔️ Зброя",
+        "magic": "🔮 Магічні предмети", 
+        "potion": "🧪 Зілля",
+        "car": "🚗 Транспорт",
+        "legendary": "🌟 Легендарні предмети"
+    }
+    
+    category_recipes = [c for c in craftable_items if c['recipe'].get('result_type') == category]
+    
+    text = (
+        f"🛠️ <b>Крафтинг - {category_names.get(category, 'Предмети')}</b>\n\n"
+        f"💎 Баланс: {user_coins} ✯\n\n"
+    )
+    
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    if not category_recipes:
+        text += "❌ Немає рецептів у цій категорії!"
+    else:
+        for craftable in category_recipes:
+            recipe = craftable["recipe"]
+            emoji = "✅" if craftable["can_craft"] else "❌"
+            
+            text += f"\n{emoji} <b>{recipe['name']}</b>\n"
+            text += f"💰 Вартість крафту: {recipe['cost']} ✯\n"
+            
+            # Інгредієнти
+            text += "📦 Потрібно: "
+            ingredients_text = []
+            for ingredient in recipe["ingredients"]:
+                ingredients_text.append(f"{ingredient['name']} x{ingredient['quantity']}")
+            text += ", ".join(ingredients_text) + "\n"
+            
+            # Результат
+            if recipe["result"] == "random_car":
+                text += f"🎁 Результат: Випадкова машина\n"
+            else:
+                text += f"🎁 Результат: {recipe['result']} ({recipe['result_price']} ✯)\n"
+            
+            # Статус
+            if not craftable["can_craft"]:
+                text += f"❌ Не вистачає: {', '.join(craftable['missing_ingredients'])}\n"
+            
+            text += "\n"
+            
+            # Кнопка
+            if craftable["can_craft"] and user_coins >= recipe["cost"]:
+                kb.insert(InlineKeyboardButton(
+                    f"🛠️ {recipe['name']} - {recipe['cost']}✯", 
+                    callback_data=f"craft_item_{recipe['id']}"
+                ))
+            else:
+                kb.insert(InlineKeyboardButton(
+                    f"❌ {recipe['name']}", 
+                    callback_data="cannot_craft"
+                ))
+    
+    if not any(craftable["can_craft"] for craftable in category_recipes):
+        text += "\n💡 Зберіть потрібні предмети з магазину або рулетки!"
+    
+    kb.add(InlineKeyboardButton("📂 Всі категорії", callback_data="crafting_menu"))
+    kb.add(InlineKeyboardButton("🛍️ Магазин предметів", callback_data="shop_items"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="inventory_view"))
+    
+    await call.message.edit_text(text, reply_markup=kb)
+    
 @dp.callback_query_handler(lambda c: c.data == 'shop_levels')
 async def cb_shop_levels(call: types.CallbackQuery):
     await call.answer()
@@ -5328,7 +8039,17 @@ async def cmd_addfriend(message: types.Message):
     try:
         parts = message.text.split()
         if len(parts) != 2:
-            await message.answer("❌ Неправильний формат!\nВикористання: /addfriend ID_друга")
+            await message.answer(
+                "🤝 <b>ДОДАВАННЯ ДРУГА</b>\n\n"
+                "📝 <b>Використання:</b>\n"
+                "<code>/addfriend ID_гравця</code>\n\n"
+                "📝 <b>Приклади:</b>\n"
+                "<code>/addfriend 123456789</code>\n\n"
+                "💡 <b>Що станеться:</b>\n"
+                "• Гравець отримає пряме повідомлення\n" 
+                "• З кнопками 'Прийняти' та 'Відхилити'\n"
+                "• Після підтвердження ви станете друзями"
+            )
             return
         
         friend_id = int(parts[1])
@@ -5347,12 +8068,58 @@ async def cmd_addfriend(message: types.Message):
             return
         
         friend_username = friend_data[0]
+        from_username = message.from_user.username or message.from_user.full_name
         
-        # Додаємо друга
-        if add_friend(user_id, friend_id, friend_username):
-            await message.answer(f"✅ <b>Друга додано!</b>\n\n👤 {friend_username} тепер у вашому списку друзів!")
-        else:
+        # Перевіряємо чи вже друзі
+        cursor.execute("SELECT id FROM friends WHERE user_id = ? AND friend_id = ?", (user_id, friend_id))
+        if cursor.fetchone():
             await message.answer("❌ Цей гравець вже у вашому списку друзів!")
+            return
+        
+        # Перевіряємо чи вже надсилали запит
+        cursor.execute("SELECT id FROM friend_requests WHERE from_user_id = ? AND to_user_id = ? AND status = 'pending'", 
+                      (user_id, friend_id))
+        if cursor.fetchone():
+            await message.answer("❌ Ви вже надсилали запит цьому гравцю! Очікуйте підтвердження.")
+            return
+        
+        # Створюємо запит
+        cursor.execute("""
+            INSERT INTO friend_requests (from_user_id, from_username, to_user_id, created_date)
+            VALUES (?, ?, ?, ?)
+        """, (user_id, from_username, friend_id, datetime.now().isoformat()))
+        
+        conn.commit()
+        
+        # Сповіщуємо того хто надіслав запит
+        await message.answer(
+            f"📨 <b>Запит у друзі надіслано!</b>\n\n"
+            f"👤 Гравець: {friend_username}\n"
+            f"🆔 ID: {friend_id}\n\n"
+            f"💡 Очікуйте підтвердження! Гравець отримав сповіщення."
+        )
+        
+        # Надсилаємо ПРЯМЕ СПОВІЩЕННЯ гравцю з кнопками
+        try:
+            request_id = cursor.lastrowid  # Отримуємо ID щойно створеного запиту
+            
+            await bot.send_message(
+                friend_id,
+                f"📨 <b>НОВИЙ ЗАПИТ У ДРУЗІ</b>\n\n"
+                f"👤 <b>{from_username}</b> хоче додати вас у друзі!\n\n"
+                f"🆔 ID: {user_id}\n"
+                f"⏰ Час: {datetime.now().strftime('%H:%M')}\n\n"
+                f"🤝 Ви хочете прийняти цей запит?",
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("✅ Прийняти", callback_data=f"friend_accept_{request_id}"),
+                    InlineKeyboardButton("❌ Відхилити", callback_data=f"friend_reject_{request_id}")
+                )
+            )
+        except Exception as e:
+            await message.answer(f"❌ Не вдалося відправити запит. Можливо, гравець заблокував бота.")
+            # Видаляємо запит якщо не вдалось відправити
+            cursor.execute("DELETE FROM friend_requests WHERE id = ?", (request_id,))
+            conn.commit()
             
     except ValueError:
         await message.answer("❌ Помилка! ID має бути числом.")
@@ -5415,6 +8182,169 @@ async def cmd_transfer(message: types.Message):
             
     except ValueError:
         await message.answer("❌ Помилка! Перевірте правильність введених даних.")
+    except Exception as e:
+        await message.answer(f"❌ Помилка: {e}")
+
+@dp.message_handler(commands=['business'])
+async def cmd_business(message: types.Message):
+    """Команда для відкриття бізнес-меню"""
+    user_id = message.from_user.id
+    ensure_player(user_id, message.from_user.username or message.from_user.full_name)
+    
+    license_info = get_user_business_license(user_id)
+    user_businesses = get_user_businesses(user_id)
+    total_income = get_total_business_income(user_id)
+    
+    text = (
+        f"🏢 <b>Бізнес-Система</b>\n\n"
+        f"💼 Ваші бізнеси: {len(user_businesses)}/{license_info['max_businesses']}\n"
+        f"📄 Ліцензія: {license_info['name']}\n"
+        f"💰 Дохід: {total_income} ✯/6 год\n"
+        f"💎 Баланс: {get_user_coins(user_id)} ✯\n\n"
+        f"🚀 <b>Оберіть дію:</b>"
+    )
+    
+    await message.answer(text, reply_markup=build_business_menu(user_id))
+
+@dp.message_handler(commands=['takecredit'])
+async def cmd_takecredit(message: types.Message):
+    """Команда для взяття кредиту"""
+    user_id = message.from_user.id
+    ensure_player(user_id, message.from_user.username or message.from_user.full_name)
+    
+    try:
+        parts = message.text.split()
+        if len(parts) != 3:
+            await message.answer(
+                "💰 <b>ВЗЯТТЯ КРЕДИТУ</b>\n\n"
+                "📝 <b>Використання:</b>\n"
+                "<code>/takecredit ID_кредиту СУМА</code>\n\n"
+                "📝 <b>Приклади:</b>\n"
+                "<code>/takecredit 1 1000</code> - міні-кредит 1000 ✯\n"
+                "<code>/takecredit 2 5000</code> - стандартний 5000 ✯\n\n"
+                "🏦 <b>Доступні кредити:</b>\n"
+                "1. 🟢 Міні-кредит (5+ рівень) - до 5,000 ✯\n"
+                "2. 🔵 Стандартний (10+) - до 20,000 ✯\n"
+                "3. 🟣 Бізнес-кредит (15+) - до 50,000 ✯\n"
+                "4. 🟠 Інвест-кредит (20+) - до 100,000 ✯"
+            )
+            return
+        
+        credit_type_id = int(parts[1])
+        amount = int(parts[2])
+        
+        if take_credit(user_id, credit_type_id, amount):
+            credit_type = next((ct for ct in CreditSystem.CREDIT_TYPES if ct["id"] == credit_type_id), None)
+            total_interest = calculate_credit_interest(amount, credit_type["interest_rate"], credit_type["term_hours"])
+            
+            await message.answer(
+                f"🎉 <b>Кредит успішно видано!</b>\n\n"
+                f"🏦 Тип: {credit_type['name']}\n"
+                f"💰 Сума: {amount:,} ✯\n"
+                f"📈 Відсотки: {total_interest:,} ✯\n"
+                f"💸 Загалом до сплати: {amount + total_interest:,} ✯\n"
+                f"⏰ Термін: {credit_type['term_hours']} годин\n\n"
+                f"💎 Новий баланс: {get_user_coins(user_id):,} ✯\n\n"
+                f"💡 Кредит автоматично погашатиметься з вашого доходу!"
+            )
+        else:
+            await message.answer("❌ Не вдалося взяти кредит! Перевірте умови.")
+            
+    except ValueError:
+        await message.answer("❌ Помилка! Перевірте правильність введених даних.")
+    except Exception as e:
+        await message.answer(f"❌ Помилка: {e}")
+
+@dp.message_handler(commands=['bank'])
+async def cmd_bank(message: types.Message):
+    """Команда для відкриття банку"""
+    user_id = message.from_user.id
+    ensure_player(user_id, message.from_user.username or message.from_user.full_name)
+    
+    active_credits = get_user_active_credits(user_id)
+    total_debt = sum(credit['remaining'] for credit in active_credits)
+    
+    text = (
+        f"🏦 <b>Банк - Кредитна система</b>\n\n"
+        f"💼 Активних кредитів: {len(active_credits)}\n"
+        f"💸 Загальний борг: {total_debt:,} ✯\n"
+        f"💎 Ваш баланс: {get_user_coins(user_id):,} ✯\n"
+        f"📈 Ваш дохід: {get_total_passive_income(user_id)} ✯/6 год\n\n"
+        f"🚀 <b>Оберіть дію:</b>"
+    )
+    
+    await message.answer(text, reply_markup=build_bank_menu(user_id))
+
+@dp.message_handler(commands=['friends'])
+async def cmd_friends(message: types.Message):
+    """Команда для перегляду друзів та запитів"""
+    user_id = message.from_user.id
+    ensure_player(user_id, message.from_user.username or message.from_user.full_name)
+    
+    friends = get_user_friends(user_id)
+    pending_requests = get_pending_friend_requests(user_id)
+    
+    text = (
+        f"🤝 <b>Система друзів</b>\n\n"
+        f"👥 Друзів: {len(friends)}\n"
+        f"📨 Запитів: {len(pending_requests)}\n\n"
+    )
+    
+    if pending_requests:
+        text += f"💡 У вас є {len(pending_requests)} нових запитів у друзі!\n"
+        text += f"🎯 Використайте меню нижче щоб переглянути їх."
+    
+    await message.answer(text, reply_markup=build_friends_menu(user_id))
+
+@dp.message_handler(commands=['removefriend'])
+async def cmd_removefriend(message: types.Message):
+    """Команда для видалення друга"""
+    user_id = message.from_user.id
+    ensure_player(user_id, message.from_user.username or message.from_user.full_name)
+    
+    try:
+        parts = message.text.split()
+        if len(parts) != 2:
+            await message.answer(
+                "🗑️ <b>ВИДАЛЕННЯ ДРУГА</b>\n\n"
+                "📝 <b>Використання:</b>\n"
+                "<code>/removefriend ID_друга</code>\n\n"
+                "📝 <b>Приклади:</b>\n"
+                "<code>/removefriend 123456789</code>\n\n"
+                "💡 <b>Альтернатива:</b> Використовуйте меню друзів для зручного вибору."
+            )
+            return
+        
+        friend_id = int(parts[1])
+        
+        # Перевіряємо чи це друг
+        friend_info = get_friend_info(user_id, friend_id)
+        if not friend_info:
+            await message.answer("❌ Цей гравець не у вашому списку друзів!")
+            return
+        
+        # Видаляємо друга
+        if remove_friend(user_id, friend_id):
+            await message.answer(
+                f"✅ <b>Друга видалено!</b>\n\n"
+                f"👤 {friend_info['username']} був видалений з вашого списку друзів.\n\n"
+                f"💔 Ви більше не будете друзями в системі."
+            )
+            
+            # Сповіщаємо друга
+            try:
+                await bot.send_message(
+                    friend_id,
+                    f"💔 <b>ВИ ВИДАЛЕНІ З ДРУЗІВ</b>\n\n"
+                    f"👤 {message.from_user.username or message.from_user.full_name} видалив вас зі списку друзів."
+                )
+            except:
+                pass
+        else:
+            await message.answer("❌ Не вдалося видалити друга!")
+            
+    except ValueError:
+        await message.answer("❌ Помилка! ID має бути числом.")
     except Exception as e:
         await message.answer(f"❌ Помилка: {e}")
 
@@ -5758,7 +8688,87 @@ async def cmd_sellitem(message: types.Message):
     except Exception as e:
         await message.answer(f"❌ Помилка: {e}")
 
-#AUTO-DELETE
+
+
+
+
+# ========== БІЗНЕС СИСТЕМА ==========
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS user_business_licenses (
+    user_id INTEGER PRIMARY KEY,
+    license_id INTEGER DEFAULT 1,
+    max_businesses INTEGER DEFAULT 2,
+    purchased_date TEXT,
+    FOREIGN KEY (user_id) REFERENCES players (user_id)
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS user_businesses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    business_type INTEGER NOT NULL,
+    business_name TEXT NOT NULL,
+    level INTEGER DEFAULT 1,
+    income INTEGER NOT NULL,
+    purchased_date TEXT NOT NULL,
+    last_income_time TEXT,
+    FOREIGN KEY (user_id) REFERENCES players (user_id)
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS business_types (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    min_level INTEGER NOT NULL,
+    base_price INTEGER NOT NULL,
+    business_type TEXT NOT NULL,
+    max_level INTEGER DEFAULT 10,
+    upgrade_multiplier REAL DEFAULT 1.8,
+    base_income INTEGER NOT NULL,
+    income_multiplier REAL DEFAULT 1.5
+)
+""")
+
+# Заповнюємо типи бізнесів
+cursor.execute("SELECT COUNT(*) FROM business_types")
+if cursor.fetchone()[0] == 0:
+    business_types_data = [
+        (1, "🚕 Таксопарк", 6, 50000, "service", 10, 1.8, 300, 1.5),
+        (2, "🏪 Продуктовий магазин", 8, 100000, "retail", 10, 1.8, 600, 1.5),
+        (3, "🔧 Автосервіс", 10, 200000, "service", 10, 1.8, 1200, 1.5),
+        (4, "🍕 Ресторан", 12, 500000, "food", 10, 1.8, 3000, 1.5),
+        (5, "🏢 Офісний центр", 15, 1000000, "real_estate", 10, 1.8, 6000, 1.5)
+    ]
+    cursor.executemany(
+        "INSERT INTO business_types (id, name, min_level, base_price, business_type, max_level, upgrade_multiplier, base_income, income_multiplier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        business_types_data
+    )
+
+# Ліцензії
+# Ліцензії (спрощена версія)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS business_licenses (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    max_businesses INTEGER NOT NULL,
+    price INTEGER NOT NULL
+)
+""")
+
+cursor.execute("SELECT COUNT(*) FROM business_licenses")
+if cursor.fetchone()[0] == 0:
+    licenses_data = [
+        (1, "🟢 BI License", 4, 16400),
+        (2, "🔵 DS License", 5, 19400),
+        (3, "🟣 GT License", 6, 32000)
+    ]
+    cursor.executemany(
+        "INSERT INTO business_licenses (id, name, max_businesses, price) VALUES (?, ?, ?, ?)",
+        licenses_data
+    )
+
 # ========== СИСТЕМА АВТОМАТИЧНОГО ВИДАЛЕННЯ ==========
 
 async def delete_message_with_delay(chat_id: int, message_id: int, delay: int = 20):
@@ -5856,9 +8866,15 @@ def update_income_for_user(user_id: int):
             new_income_time = last_income_time + timedelta(hours=6 * full_periods)
             cursor.execute("UPDATE players SET last_income_time = ? WHERE user_id = ?", 
                            (new_income_time.isoformat(), user_id))
+
+            # Додаємо дохід від бізнесів (кожні 6 годин)
+            business_income = get_total_business_income(user_id)
+            if business_income > 0:
+                add_user_coins(user_id, business_income)
+                print(f"💼 Нараховано {business_income} ✯ від бізнесів гравцю {user_id}")
+            
             conn.commit()
             print(f"💵 Нараховано {total_income} ✯ гравцю {user_id} за {full_periods * 6} год.")
-
 async def update_all_incomes():
     """Оновити доходи для всіх гравців"""
     try:
@@ -5876,27 +8892,23 @@ async def update_all_incomes():
         print(f"❌ Помилка оновлення доходів: {e}")
 
 async def income_scheduler():
-    """Планувальник для автоматичного нарахування доходів (тепер кожні 6 годин)"""
+    """Планувальник для автоматичного нарахування доходів та кредитних виплат"""
     while True:
         try:
             await update_all_incomes()
-            await asyncio.sleep(6 * 3600)  # 6 годин замість 1
+            await asyncio.sleep(6 * 3600)  # Дохід кожні 6 годин
         except Exception as e:
             print(f"❌ Помилка в планувальнику доходів: {e}")
             await asyncio.sleep(300)
 
-async def background_tasks():
-    """Фонові задачі"""
+async def credit_payment_scheduler():
+    """Планувальник для кредитних виплат (кожну годину)"""
     while True:
         try:
-            # Очищаємо старі пропозиції продажів
-            week_ago = (datetime.now() - timedelta(days=7)).isoformat()
-            cursor.execute("DELETE FROM pending_sales WHERE created_date < ?", (week_ago,))
-            conn.commit()
-            
-            await asyncio.sleep(3600)  # Перевіряємо кожну годину
+            process_credit_payments()
+            await asyncio.sleep(3600)  # Кредитні виплати кожну годину
         except Exception as e:
-            print(f"❌ Помилка в background_tasks: {e}")
+            print(f"❌ Помилка в планувальнику кредитів: {e}")
             await asyncio.sleep(300)
 
 # ========== ОНОВЛЕННЯ СТРУКТУРИ БАЗИ ========== БД
