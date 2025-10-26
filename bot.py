@@ -14,7 +14,7 @@ from aiogram.utils import executor
 from website import setup_website_in_bot, start_website_server
 
 # ========== КОНФИГ ==========
-BOT_TOKEN = "8259900558:AAHQVUzKQBtKF7N-Xp8smLmAiAf0Hu-hQHw"
+BOT_TOKEN = "8160983444:AAF-qKOw_MtVhFPtnejy3UcbPT59riKrsd8"
 XP_PER_LEVEL = 100
 INACTIVE_DAYS = 7
 DB_PATH = "data.db"
@@ -8915,15 +8915,11 @@ async def credit_payment_scheduler():
 # ========== ОНОВЛЕННЯ СТРУКТУРИ БАЗИ ========== БД
 #====---- pass ----======
 # Перевіряємо чи є колонка has_passport
-# ВМЕСТО ЭТОГО добавь проверку:
-cursor.execute("PRAGMA table_info(players)")
-columns = [column[1] for column in cursor.fetchall()]
-
-if 'has_passport' not in columns:
+if 'has_passport' not in player_columns:
+    print("🔄 Додаємо колонку has_passport до таблиці players...")
     cursor.execute("ALTER TABLE players ADD COLUMN has_passport BOOLEAN DEFAULT FALSE")
-    print(" ✅ Колонку has_passport додано!")
-else:
-    print(" ✅ Колонка has_passport вже існує!")
+    conn.commit()
+    print("✅ Колонку has_passport додано!")
 
 # Додамо в секцію оновлення БД
 if 'has_passport' not in player_columns:
