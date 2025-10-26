@@ -11,10 +11,6 @@ import os
 # Используем существующее подключение к базе
 DB_PATH = "data.db"
 
-def get_server_url():
-    """Автоматически определяет URL сервера"""
-    return "http://104.248.184.38:8080"  # Просто хардкод твоего IP
-
 class WebsiteServer:
     def __init__(self):
         self.app = web.Application()
@@ -251,24 +247,13 @@ class WebsiteServer:
         
         return web.json_response(user_data)
 
-async def start_server(self):
-    """Запуск сервера"""
-    runner = web.AppRunner(self.app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080)
-    await site.start()
-    
-    server_url = get_server_url()
-    print("🌐 Website server started!")
-    print(f"📱 Сайт доступен по ссылке: {server_url}")
-    print("🔑 Получи код доступа в боте командой /website")
-
-# Запуск сервера
-async def start_website_server():
-    global website_server
-    website_server = WebsiteServer()
-    await website_server.start_server()  # ← теперь start_server()
-    return website_server
+    async def start(self):
+        """Запуск сервера"""
+        runner = web.AppRunner(self.app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', 8080)
+        await site.start()
+        print("🌐 Website server started on http://0.0.0.0:8080")
 
 # Интеграция с ботом
 def setup_website_in_bot(dp):
@@ -296,13 +281,13 @@ def setup_website_in_bot(dp):
         conn.commit()
         conn.close()
         
-        server_url = "http://localhost:8080"
+        site_url = "http://localhost:8080"
         
         await message.answer(
             f"🌐 <b>Доступ к веб-сайту</b>\n\n"
             f"🔑 <b>Ваш код доступа:</b> <code>{token}</code>\n\n"
             f"📱 <b>Перейдите на сайт:</b>\n"
-            f"{server_url}\n\n"
+            f"{site_url}\n\n"
             f"💡 <b>Инструкция:</b>\n"
             f"1. Откройте сайт в браузере\n"
             f"2. Введите код доступа\n"
@@ -322,7 +307,7 @@ website_server = None
 async def start_website_server():
     global website_server
     website_server = WebsiteServer()
-    await website_server.start()  # ← здесь вызывается start()
+    await website_server.start()
     return website_server
 
 if __name__ == "__main__":
