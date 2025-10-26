@@ -315,7 +315,7 @@ website_server = None
 async def start_website_server():
     global website_server
     website_server = WebsiteServer()
-    await website_server.start()
+    await website_server.start()  # ← здесь вызывается start()
     return website_server
 
 if __name__ == "__main__":
