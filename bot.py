@@ -11,9 +11,10 @@ from math import ceil
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils import executor
+from website import setup_website_in_bot, start_website_server
 
 # ========== КОНФИГ ==========
-BOT_TOKEN = "8259900558:AAHQVUzKQBtKF7N-Xp8smLmAiAf0Hu-hQHw"
+BOT_TOKEN = "8160983444:AAF-qKOw_MtVhFPtnejy3UcbPT59riKrsd8"
 XP_PER_LEVEL = 100
 INACTIVE_DAYS = 7
 DB_PATH = "data.db"
@@ -9052,6 +9053,12 @@ async def cb_refresh_us(call: types.CallbackQuery):
     await call.answer("✅ Список оновлено!")
 
         # ========== ЗАПУСК БОТА ==========
+async def on_startup(dp):
+    # Запуск веб-сервера
+    website_server = await start_website_server()
+    dp.website_server = website_server
+    setup_website_in_bot(dp)
+    
 async def main():
     """Головна асинхронна функція"""
     # Ініціалізація рулетки предметів
@@ -9083,11 +9090,5 @@ async def main():
         conn.close()
 
 if __name__ == "__main__":
-    try:
-        # Запускаємо головну асинхронну функцію
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        log.info("🛑 Бот зупинено користувачем")
-    except Exception as e:
-        log.error(f"❌ Критична помилка: {e}")
-        conn.close()
+    from aiogram import executor
+    executor.start_polling(dp, on_startup=on_startup, skip_updates=True)
