@@ -7,9 +7,26 @@ import json
 import secrets
 from datetime import datetime, timedelta
 import os
+import socket
+import requests
 
 # Используем существующее подключение к базе
 DB_PATH = "data.db"
+
+def get_server_url():
+    """Автоматически определяет URL сервера"""
+    try:
+        # Пробуем получить внешний IP
+        external_ip = requests.get('https://api.ipify.org', timeout=5).text
+        return f"http://{external_ip}:8080"
+    except:
+        try:
+            # Если не получилось, получаем локальный IP
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+            return f"http://{local_ip}:8080"
+        except:
+            return "http://localhost:8080"
 
 class WebsiteServer:
     def __init__(self):
@@ -247,13 +264,17 @@ class WebsiteServer:
         
         return web.json_response(user_data)
 
-    async def start(self):
-        """Запуск сервера"""
-        runner = web.AppRunner(self.app)
-        await runner.setup()
-        site = web.TCPSite(runner, '0.0.0.0', 8080)
-        await site.start()
-        print("🌐 Website server started on http://0.0.0.0:8080")
+async def start(self):
+    """Запуск сервера"""
+    runner = web.AppRunner(self.app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+    
+    server_url = get_server_url()
+    print("🌐 Website server started!")
+    print(f"📱 Сайт доступен по ссылке: {server_url}")
+    print("🔑 Получи код доступа в боте командой /website")
 
 # Интеграция с ботом
 def setup_website_in_bot(dp):
@@ -281,7 +302,7 @@ def setup_website_in_bot(dp):
         conn.commit()
         conn.close()
         
-        site_url = "http://localhost:8080"
+        server_url = get_server_url()
         
         await message.answer(
             f"🌐 <b>Доступ к веб-сайту</b>\n\n"
