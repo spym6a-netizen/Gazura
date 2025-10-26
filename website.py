@@ -7,26 +7,13 @@ import json
 import secrets
 from datetime import datetime, timedelta
 import os
-import socket
-import requests
 
 # Используем существующее подключение к базе
 DB_PATH = "data.db"
 
 def get_server_url():
     """Автоматически определяет URL сервера"""
-    try:
-        # Пробуем получить внешний IP
-        external_ip = requests.get('https://api.ipify.org', timeout=5).text
-        return f"http://{external_ip}:8080"
-    except:
-        try:
-            # Если не получилось, получаем локальный IP
-            hostname = socket.gethostname()
-            local_ip = socket.gethostbyname(hostname)
-            return f"http://{local_ip}:8080"
-        except:
-            return "http://localhost:8080"
+    return "http://104.248.184.38:8080"  # Просто хардкод твоего IP
 
 class WebsiteServer:
     def __init__(self):
@@ -302,7 +289,7 @@ def setup_website_in_bot(dp):
         conn.commit()
         conn.close()
         
-        server_url = get_server_url()
+        server_url = "http://localhost:8080"
         
         await message.answer(
             f"🌐 <b>Доступ к веб-сайту</b>\n\n"
