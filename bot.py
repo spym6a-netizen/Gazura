@@ -14,7 +14,7 @@ from aiogram.utils import executor
 from website import setup_website_in_bot, start_website_server
 
 # ========== КОНФИГ ==========
-BOT_TOKEN = "8160983444:AAF-qKOw_MtVhFPtnejy3UcbPT59riKrsd8"
+BOT_TOKEN = "8259900558:AAHQVUzKQBtKF7N-Xp8smLmAiAf0Hu-hQHw"
 XP_PER_LEVEL = 100
 INACTIVE_DAYS = 7
 DB_PATH = "data.db"
