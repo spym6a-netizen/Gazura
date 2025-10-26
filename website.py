@@ -251,7 +251,7 @@ class WebsiteServer:
         
         return web.json_response(user_data)
 
-async def start(self):
+async def start(self):  # Добавь async
     """Запуск сервера"""
     runner = web.AppRunner(self.app)
     await runner.setup()
