@@ -41,11 +41,13 @@ class WebsiteServer:
         self.app.router.add_get('/api/user_data', self.handle_user_data)
         self.app.router.add_post('/api/tap', self.handle_tap)
         self.app.router.add_post('/api/sync', self.handle_sync)
-        # Убрал статическую папку, так как она не нужна сейчас
+        
+        # ДОБАВЛЯЕМ новые роуты для поиска и топа
+        self.app.router.add_get('/api/top_players', self.handle_top_players)
+        self.app.router.add_get('/api/search_players', self.handle_search_players)
 
     async def handle_index(self, request):
         """Главная страница"""
-        # Читаем index.html и отдаем его
         try:
             with open('index.html', 'r', encoding='utf-8') as f:
                 content = f.read()
@@ -246,6 +248,129 @@ class WebsiteServer:
         user_data = self.get_user_data(user_id)
         
         return web.json_response(user_data)
+
+    # ДОБАВЛЯЕМ новые методы для поиска и топа
+    async def handle_top_players(self, request):
+        """Топ игроков"""
+        try:
+            top_type = request.query.get('type', 'coins')
+            limit = int(request.query.get('limit', 20))
+            
+            # Получаем топ из базы данных
+            players = await self.get_top_players(top_type, limit)
+            
+            return web.json_response({
+                'players': players,
+                'type': top_type
+            })
+            
+        except Exception as e:
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def handle_search_players(self, request):
+        """Поиск игроков"""
+        try:
+            username = request.query.get('username')
+            user_id = request.query.get('user_id')
+            
+            if username:
+                players = await self.search_players_by_username(username)
+            elif user_id:
+                players = await self.search_players_by_user_id(user_id)
+            else:
+                return web.json_response({'error': 'Не указаны параметры поиска'}, status=400)
+            
+            return web.json_response({
+                'players': players,
+                'count': len(players)
+            })
+            
+        except Exception as e:
+            return web.json_response({'error': str(e)}, status=500)
+
+    async def get_top_players(self, top_type, limit):
+        """Получение топа игроков из базы"""
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        if top_type == 'coins':
+            query = "SELECT user_id, username, level, coins, total_taps, role, has_passport FROM players ORDER BY coins DESC LIMIT ?"
+        elif top_type == 'level':
+            query = "SELECT user_id, username, level, coins, total_taps, role, has_passport FROM players ORDER BY level DESC LIMIT ?"
+        elif top_type == 'taps':
+            query = "SELECT user_id, username, level, coins, total_taps, role, has_passport FROM players ORDER BY total_taps DESC LIMIT ?"
+        else:
+            return []
+        
+        cursor.execute(query, (limit,))
+        players = []
+        
+        for row in cursor.fetchall():
+            user_id, username, level, coins, total_taps, role, has_passport = row
+            players.append({
+                'user_id': user_id,
+                'username': username,
+                'level': level,
+                'coins': coins,
+                'total_taps': total_taps,
+                'role': role,
+                'has_passport': bool(has_passport)
+            })
+        
+        conn.close()
+        return players
+
+    async def search_players_by_username(self, username):
+        """Поиск игроков по имени"""
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT user_id, username, level, coins, total_taps, role, has_passport FROM players WHERE username LIKE ? LIMIT 10",
+            (f'%{username}%',)
+        )
+        
+        players = []
+        for row in cursor.fetchall():
+            user_id, username, level, coins, total_taps, role, has_passport = row
+            players.append({
+                'user_id': user_id,
+                'username': username,
+                'level': level,
+                'coins': coins,
+                'total_taps': total_taps,
+                'role': role,
+                'has_passport': bool(has_passport)
+            })
+        
+        conn.close()
+        return players
+
+    async def search_players_by_user_id(self, user_id):
+        """Поиск игрока по ID"""
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT user_id, username, level, coins, total_taps, role, has_passport FROM players WHERE user_id = ?",
+            (user_id,)
+        )
+        
+        players = []
+        for row in cursor.fetchall():
+            user_id, username, level, coins, total_taps, role, has_passport = row
+            players.append({
+                'user_id': user_id,
+                'username': username,
+                'level': level,
+                'coins': coins,
+                'total_taps': total_taps,
+                'role': role,
+                'has_passport': bool(has_passport)
+            })
+        
+        conn.close()
+        return players
 
     async def start(self):
         """Запуск сервера"""
