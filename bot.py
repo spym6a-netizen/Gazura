@@ -8915,11 +8915,15 @@ async def credit_payment_scheduler():
 # ========== ОНОВЛЕННЯ СТРУКТУРИ БАЗИ ========== БД
 #====---- pass ----======
 # Перевіряємо чи є колонка has_passport
-if 'has_passport' not in player_columns:
-    print("🔄 Додаємо колонку has_passport до таблиці players...")
+# ВМЕСТО ЭТОГО добавь проверку:
+cursor.execute("PRAGMA table_info(players)")
+columns = [column[1] for column in cursor.fetchall()]
+
+if 'has_passport' not in columns:
     cursor.execute("ALTER TABLE players ADD COLUMN has_passport BOOLEAN DEFAULT FALSE")
-    conn.commit()
-    print("✅ Колонку has_passport додано!")
+    print(" ✅ Колонку has_passport додано!")
+else:
+    print(" ✅ Колонка has_passport вже існує!")
 
 # Додамо в секцію оновлення БД
 if 'has_passport' not in player_columns:
