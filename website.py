@@ -251,7 +251,7 @@ class WebsiteServer:
         
         return web.json_response(user_data)
 
-async def start(self):  # Добавь async
+async def start_server(self):
     """Запуск сервера"""
     runner = web.AppRunner(self.app)
     await runner.setup()
@@ -262,6 +262,13 @@ async def start(self):  # Добавь async
     print("🌐 Website server started!")
     print(f"📱 Сайт доступен по ссылке: {server_url}")
     print("🔑 Получи код доступа в боте командой /website")
+
+# Запуск сервера
+async def start_website_server():
+    global website_server
+    website_server = WebsiteServer()
+    await website_server.start_server()  # ← теперь start_server()
+    return website_server
 
 # Интеграция с ботом
 def setup_website_in_bot(dp):
