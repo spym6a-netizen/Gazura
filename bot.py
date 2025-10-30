@@ -17,27 +17,52 @@ import subprocess
 import sys
 import os
 import atexit
+import time
 
 def start_website_server():
     """Запуск веб-сервера"""
     try:
+        # Проверяем существует ли файл server.js
         if os.path.exists("server.js"):
             print("🚀 Запускаю веб-сервер...")
             
-            # Запускаем в фоне без ожидания
+            # Запускаем сервер в отдельном процессе
             website_process = subprocess.Popen(
                 ['node', 'server.js'],
-                stdout=open('website.log', 'w'),
-                stderr=subprocess.STDOUT,
-                start_new_session=True  # Важно для фонового процесса
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
             )
             
+            # Даем время на запуск
+            time.sleep(3)
+            
+            # Проверяем жив ли процесс
+            if website_process.poll() is not None:
+                # Процесс завершился - выводим ошибку
+                stdout, stderr = website_process.communicate()
+                print(f"❌ Веб-сервер завершился с ошибкой:")
+                if stderr:
+                    print(f"STDERR: {stderr}")
+                if stdout:
+                    print(f"STDOUT: {stdout}")
+                return None
+            
+            print("✅ Веб-сервер запущен!")
+            
+            # Функция для остановки сервера при выходе
             def stop_website():
                 print("🛑 Останавливаю веб-сервер...")
-                website_process.terminate()
+                if website_process.poll() is None:
+                    website_process.terminate()
+                    try:
+                        website_process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        website_process.kill()
             
             atexit.register(stop_website)
-            print("✅ Веб-сервер запущен в фоне!")
             return website_process
         else:
             print("❌ Файл server.js не найден!")
@@ -48,6 +73,12 @@ def start_website_server():
 
 # Запускаем веб-сервер при старте бота
 website_process = start_website_server()
+
+# Проверяем запустился ли сервер
+if website_process is None:
+    print("⚠️ Веб-сервер не запущен, продолжаем без него...")
+else:
+    print("🌐 Веб-сервер работает!")
 # ========== КОНФИГ ==========
 BOT_TOKEN = "8259900558:AAHQVUzKQBtKF7N-Xp8smLmAiAf0Hu-hQHw"
 XP_PER_LEVEL = 100
