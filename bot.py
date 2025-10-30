@@ -3080,7 +3080,8 @@ def build_main_menu(user_id: int):
         InlineKeyboardButton("🏆 Топ гравців", callback_data="menu_leaderboard"),
         InlineKeyboardButton("📋 Завдання", callback_data="daily_tasks"),
         InlineKeyboardButton("🛍️ Магазин", callback_data="menu_shop"),
-        InlineKeyboardButton("🏦 Банк", callback_data="bank_loans")
+        InlineKeyboardButton("🏦 Банк", callback_data="bank_loans"),
+        InlineKeyboardButton("🌐 Чат сайт", url="http://104.248.184.38:8080")  # Новая кнопка
     ]
     
     if user_id in [5672490558, 6446725004]:
