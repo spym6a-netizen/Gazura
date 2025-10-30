@@ -11,8 +11,45 @@ from math import ceil
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils import executor
-from website import setup_website_in_bot, start_website_server
 
+#====================== 
+import subprocess
+import sys
+import os
+import atexit
+
+def start_website_server():
+    """Запуск веб-сервера"""
+    try:
+        # Проверяем существует ли файл server.js
+        if os.path.exists("server.js"):
+            print("🚀 Запускаю веб-сервер...")
+            # Запускаем сервер в отдельном процессе
+            website_process = subprocess.Popen(
+                [sys.executable if sys.platform == 'win32' else 'node', 'server.js'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            # Функция для остановки сервера при выходе
+            def stop_website():
+                print("🛑 Останавливаю веб-сервер...")
+                website_process.terminate()
+                website_process.wait()
+            
+            atexit.register(stop_website)
+            print("✅ Веб-сервер запущен!")
+            return website_process
+        else:
+            print("❌ Файл server.js не найден!")
+            return None
+    except Exception as e:
+        print(f"❌ Ошибка запуска веб-сервера: {e}")
+        return None
+
+# Запускаем веб-сервер при старте бота
+website_process = start_website_server()
 # ========== КОНФИГ ==========
 BOT_TOKEN = "8259900558:AAHQVUzKQBtKF7N-Xp8smLmAiAf0Hu-hQHw"
 XP_PER_LEVEL = 100
@@ -308,6 +345,7 @@ CREATE TABLE IF NOT EXISTS pending_sales (
 conn.commit()
 
 # ========== ОНОВЛЕННЯ СТРУКТУРИ ТАБЛИЦЬ ==========
+# ========== ОНОВЛЕННЯ СТРУКТУРИ ТАБЛИЦЬ ==========
 try:
     # Перевіряємо чи є колонка income в user_real_estate
     cursor.execute("PRAGMA table_info(user_real_estate)")
@@ -339,6 +377,12 @@ try:
         cursor.execute("ALTER TABLE players ADD COLUMN last_tap_reset TEXT")
         cursor.execute("ALTER TABLE players ADD COLUMN prefix TEXT DEFAULT ''")
         print("✅ Таблицю players оновлено!")
+    
+    # Перевіряємо чи є колонка has_passport
+    if 'has_passport' not in player_columns:
+        print("🔄 Додаємо колонку has_passport до таблиці players...")
+        cursor.execute("ALTER TABLE players ADD COLUMN has_passport BOOLEAN DEFAULT FALSE")
+        print("✅ Колонку has_passport додано!")
     
     # 🔥 ДОДАЄМО ОНОВЛЕННЯ ДЛЯ USER_INVENTORY 🔥
     cursor.execute("PRAGMA table_info(user_inventory)")
@@ -9052,13 +9096,7 @@ async def cb_refresh_us(call: types.CallbackQuery):
     await cmd_us(call.message)
     await call.answer("✅ Список оновлено!")
 
-        # ========== ЗАПУСК БОТА ==========
-async def on_startup(dp):
-    # Запуск веб-сервера
-    website_server = await start_website_server()
-    dp.website_server = website_server
-    setup_website_in_bot(dp)
-    
+        # ========== ЗАПУСК БОТА ==========    
 async def main():
     """Головна асинхронна функція"""
     # Ініціалізація рулетки предметів
@@ -9091,4 +9129,4 @@ async def main():
 
 if __name__ == "__main__":
     from aiogram import executor
-    executor.start_polling(dp, on_startup=on_startup, skip_updates=True)
+    executor.start_polling(dp)
