@@ -1,0 +1,1698 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Public Chat</title>
+  <style>
+    /* Reset */
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body,#app{height:100%}
+    body{font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#0f1720;color:#d8e3ef; overflow: hidden;}
+
+    /* Auth modal */
+    .auth-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    
+    .auth-form {
+      background: #0b1220;
+      padding: 24px;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .auth-form h2 {
+      margin-bottom: 24px;
+      text-align: center;
+      font-size: 24px;
+    }
+    
+    .auth-form input {
+      width: 100%;
+      padding: 16px;
+      margin-bottom: 16px;
+      border-radius: 12px;
+      background: #071426;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #d8e3ef;
+      font-size: 16px;
+    }
+    
+    .auth-form button {
+      width: 100%;
+      padding: 16px;
+      border-radius: 12px;
+      background: #3b82f6;
+      border: none;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 16px;
+      font-size: 16px;
+    }
+    
+    .auth-switch {
+      text-align: center;
+      color: #86a0bb;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 8px;
+    }
+    
+    .auth-switch:hover {
+      color: #d8e3ef;
+    }
+
+    /* Layout */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-height: 100vh;
+      padding: 8px;
+      gap: 8px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: linear-gradient(180deg,#0b1220,#0a0f18);
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .menu-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: #132033;
+      border: none;
+      color: #d8e3ef;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .menu-btn span {
+      width: 20px;
+      height: 2px;
+      background: #d8e3ef;
+      border-radius: 1px;
+    }
+
+    /* Menu */
+    .menu {
+      position: fixed;
+      top: 80px;
+      right: 16px;
+      background: #0b1220;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.1);
+      z-index: 100;
+      min-width: 200px;
+      display: none;
+    }
+
+    .menu.show {
+      display: block;
+    }
+
+    .menu-item {
+      padding: 12px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .menu-item:hover {
+      background: #132033;
+    }
+
+    .menu-item:last-child {
+      margin-bottom: 0;
+      color: #ff7b7b;
+    }
+
+    /* Main content */
+    .main-content {
+      display: flex;
+      flex: 1;
+      gap: 8px;
+      height: calc(100% - 80px);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Channels sidebar */
+    .channels-sidebar {
+      width: 280px;
+      background: linear-gradient(180deg,#0b1220,#0a0f18);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0;
+    }
+
+    .channels-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .channels-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .add-channel {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: #132033;
+      border: none;
+      color: #d8e3ef;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .channels-list {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .channel {
+      padding: 12px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #b9c5d5;
+      cursor: pointer;
+      margin-bottom: 8px;
+      position: relative;
+    }
+
+    .channel:hover {
+      background: #091223;
+    }
+
+    .channel.active {
+      background: #132032;
+      color: #fff;
+    }
+
+    .channel .hash {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #0d1b2b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .channel.locked .hash {
+      background: #2d1b2b;
+    }
+
+    .channel-name {
+      flex: 1;
+      font-size: 15px;
+    }
+
+    .channel-count {
+      opacity: 0.6;
+      font-size: 12px;
+    }
+
+    .channel-lock {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 10px;
+      color: #86a0bb;
+    }
+
+    .channel-delete {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: transparent;
+      border: none;
+      color: #ff7b7b;
+      cursor: pointer;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .channel:hover .channel-delete {
+      opacity: 1;
+    }
+
+    .channel-delete:hover {
+      background: rgba(255, 123, 123, 0.1);
+    }
+
+    /* Chat area */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(180deg,#071022,#07101a);
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.05);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      flex-shrink: 0;
+    }
+
+    .channel-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .channel-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .channel-meta {
+      color: #9fb0c9;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .add-user-btn {
+      background: #132033;
+      border: none;
+      color: #d8e3ef;
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .messages-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .message {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      flex-shrink: 0;
+      background: #16324a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: #d8e3ef;
+      font-size: 14px;
+      overflow: hidden;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .message-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .message-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+
+    .nickname {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .time {
+      color: #86a0bb;
+      font-size: 12px;
+    }
+
+    .message-text {
+      color: #d8e3ef;
+      line-height: 1.4;
+      font-size: 15px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .own-message {
+      background: linear-gradient(180deg,#0b2a3a,#0a2532);
+      padding: 12px;
+      border-radius: 12px;
+    }
+
+    .delete-btn, .edit-btn {
+      background: transparent;
+      border: none;
+      color: #86a0bb;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px;
+      margin-left: 4px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .delete-btn:hover {
+      color: #ff7b7b;
+    }
+
+    .edit-btn:hover {
+      color: #3b82f6;
+    }
+
+    .message:hover .delete-btn,
+    .message:hover .edit-btn {
+      opacity: 1;
+    }
+
+    .edited-badge {
+      font-size: 11px;
+      color: #86a0bb;
+      margin-left: 8px;
+      font-style: italic;
+    }
+
+    /* Message composer */
+    .composer {
+      padding: 16px;
+      border-top: 1px solid rgba(255,255,255,0.03);
+      flex-shrink: 0;
+    }
+
+    .input-area {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .message-input {
+      flex: 1;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: #071426;
+      border: 1px solid rgba(255,255,255,0.03);
+      color: #d8e3ef;
+      font-size: 15px;
+      resize: none;
+      min-height: 50px;
+      max-height: 120px;
+      line-height: 1.4;
+      font-family: inherit;
+    }
+
+    .send-btn {
+      padding: 14px 20px;
+      border-radius: 12px;
+      background: #3b82f6;
+      border: none;
+      color: #041025;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 15px;
+      height: 50px;
+    }
+
+    /* Modal for avatar crop */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 20px;
+    }
+
+    .modal-content {
+      background: #0b1220;
+      padding: 24px;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .modal h3 {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .avatar-crop-container {
+      width: 100%;
+      height: 300px;
+      background: #071426;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .avatar-crop-container img {
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+    }
+
+    .modal-buttons button {
+      flex: 1;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .modal-cancel {
+      background: #132033;
+      color: #d8e3ef;
+    }
+
+    .modal-save {
+      background: #3b82f6;
+      color: white;
+    }
+
+    /* Channel creation modal */
+    .channel-type-selector {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .channel-type {
+      flex: 1;
+      padding: 16px;
+      border-radius: 12px;
+      background: #071426;
+      border: 2px solid transparent;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .channel-type.selected {
+      border-color: #3b82f6;
+      background: #0b2a3a;
+    }
+
+    .channel-type-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    /* Search modal */
+    .search-results {
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 16px;
+    }
+
+    .search-result {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: #071426;
+      cursor: pointer;
+    }
+
+    .search-result:hover {
+      background: #0b2a3a;
+    }
+
+    .search-result-channel {
+      font-size: 12px;
+      color: #86a0bb;
+      margin-bottom: 4px;
+    }
+
+    /* Loading and states */
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #86a0bb;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Scrollbars */
+    .channels-list::-webkit-scrollbar,
+    .messages::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .channels-list::-webkit-scrollbar-thumb,
+    .messages::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+      .app {
+        padding: 6px;
+        gap: 6px;
+      }
+      
+      .main-content {
+        flex-direction: column;
+        height: calc(100% - 70px);
+      }
+      
+      .channels-sidebar {
+        width: 100%;
+        height: 200px;
+        order: 2;
+      }
+      
+      .chat-area {
+        order: 1;
+        flex: 1;
+      }
+      
+      .header {
+        padding: 10px 14px;
+      }
+      
+      .header-title {
+        font-size: 16px;
+      }
+      
+      .menu {
+        top: 70px;
+        right: 12px;
+      }
+    }
+
+    /* Small phones */
+    @media (max-width: 480px) {
+      .auth-form {
+        padding: 20px;
+      }
+      
+      .channel .hash {
+        width: 28px;
+        height: 28px;
+      }
+      
+      .avatar {
+        width: 40px;
+        height: 40px;
+      }
+      
+      .message-input {
+        padding: 12px 14px;
+        font-size: 14px;
+      }
+      
+      .send-btn {
+        padding: 12px 16px;
+        height: 46px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Auth Modal -->
+  <div id="authModal" class="auth-modal">
+    <div class="auth-form">
+      <h2 id="authTitle">Вход в чат</h2>
+      <div id="loginForm">
+        <input type="text" id="loginUsername" placeholder="Имя пользователя" />
+        <input type="password" id="loginPassword" placeholder="Пароль" />
+        <button id="loginBtn">Войти</button>
+        <div class="auth-switch" id="showRegister">Нет аккаунта? Зарегистрироваться</div>
+      </div>
+      <div id="registerForm" class="hidden">
+        <input type="text" id="registerUsername" placeholder="Имя пользователя" />
+        <input type="password" id="registerPassword" placeholder="Пароль" />
+        <button id="registerBtn">Зарегистрироваться</button>
+        <div class="auth-switch" id="showLogin">Уже есть аккаунт? Войти</div>
+      </div>
+      <div id="authError" class="danger" style="margin-top: 10px; text-align: center; color: #ff7b7b;"></div>
+    </div>
+  </div>
+
+  <!-- Avatar Crop Modal -->
+  <div id="avatarModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Обрезка аватара</h3>
+      <div class="avatar-crop-container">
+        <img id="avatarCropImage" src="" alt="Аватар для обрезки" />
+      </div>
+      <div class="modal-buttons">
+        <button class="modal-cancel" id="avatarCancelBtn">Отмена</button>
+        <button class="modal-save" id="avatarSaveBtn">Сохранить аватар</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Channel Creation Modal -->
+  <div id="channelModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Создание канала</h3>
+      <input type="text" id="channelNameInput" placeholder="Имя канала (латинские буквы, цифры)" style="width:100%;padding:12px;margin-bottom:16px;border-radius:8px;background:#071426;border:1px solid rgba(255,255,255,0.1);color:#d8e3ef;" />
+      <input type="text" id="channelTitleInput" placeholder="Заголовок канала" style="width:100%;padding:12px;margin-bottom:20px;border-radius:8px;background:#071426;border:1px solid rgba(255,255,255,0.1);color:#d8e3ef;" />
+      
+      <div class="channel-type-selector">
+        <div class="channel-type" id="publicChannelType">
+          <div class="channel-type-icon">🌐</div>
+          <div>Публичный</div>
+          <div style="font-size:12px;color:#86a0bb;margin-top:4px;">Виден всем</div>
+        </div>
+        <div class="channel-type" id="privateChannelType">
+          <div class="channel-type-icon">🔒</div>
+          <div>Приватный</div>
+          <div style="font-size:12px;color:#86a0bb;margin-top:4px;">Только для вас</div>
+        </div>
+      </div>
+      
+      <div class="modal-buttons">
+        <button class="modal-cancel" id="channelCancelBtn">Отмена</button>
+        <button class="modal-save" id="channelCreateBtn">Создать канал</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Modal -->
+  <div id="searchModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Поиск сообщений</h3>
+      <input type="text" id="searchInput" placeholder="Введите текст для поиска..." style="width:100%;padding:12px;margin-bottom:16px;border-radius:8px;background:#071426;border:1px solid rgba(255,255,255,0.1);color:#d8e3ef;" />
+      <div class="search-results" id="searchResults">
+        <div class="loading">Введите поисковый запрос...</div>
+      </div>
+      <div class="modal-buttons">
+        <button class="modal-cancel" id="searchCancelBtn">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Message Modal -->
+  <div id="editModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Редактирование сообщения</h3>
+      <textarea id="editMessageInput" style="width:100%;padding:12px;margin-bottom:20px;border-radius:8px;background:#071426;border:1px solid rgba(255,255,255,0.1);color:#d8e3ef;min-height:100px;resize:vertical;"></textarea>
+      <div class="modal-buttons">
+        <button class="modal-cancel" id="editCancelBtn">Отмена</button>
+        <button class="modal-save" id="editSaveBtn">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="app hidden">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-title">
+        <span>Чат</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="menu-btn" id="searchBtn" title="Поиск">
+          🔍
+        </button>
+        <button class="menu-btn" id="menuBtn">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Menu -->
+    <div class="menu" id="menu">
+      <div class="menu-item" id="changeAvatarBtn">
+        <div style="width:20px;height:20px;background:#3b82f6;border-radius:4px;"></div>
+        <span>Сменить аватар</span>
+      </div>
+      <div class="menu-item" id="adminStatsBtn" style="display:none;">
+        <div style="width:20px;height:20px;background:#10b981;border-radius:4px;"></div>
+        <span>Статистика</span>
+      </div>
+      <div class="menu-item" id="logoutBtn">
+        <div style="width:20px;height:20px;background:#ff7b7b;border-radius:4px;"></div>
+        <span>Выйти</span>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Channels Sidebar -->
+      <div class="channels-sidebar">
+        <div class="channels-header">
+          <div class="channels-title">Каналы</div>
+          <button class="add-channel" id="addChannel">+</button>
+        </div>
+        <div class="channels-list" id="channelsList">
+          <div class="loading">Загрузка каналов...</div>
+        </div>
+      </div>
+
+      <!-- Chat Area -->
+      <div class="chat-area">
+        <div class="chat-header">
+          <div class="channel-info">
+            <div class="channel-title" id="currentChannel">#general</div>
+            <div class="channel-meta" id="channelMeta">
+              <span id="channelDescription">Общий — публичный канал</span>
+              <button class="add-user-btn hidden" id="addUserBtn" title="Добавить пользователя">+</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="messages-container">
+          <div class="messages" id="messages">
+            <div class="loading">Загрузка сообщений...</div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="input-area">
+            <textarea 
+              id="messageInput" 
+              class="message-input" 
+              placeholder="Напишите сообщение..."
+              rows="1"
+            ></textarea>
+            <button class="send-btn" id="sendBtn">➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Константы
+    const ADMIN_USERNAME = 'pym6a';
+    
+    // API functions
+    const API_BASE = '/api';
+    
+    async function apiCall(endpoint, options = {}) {
+      const token = localStorage.getItem('chat_token');
+      const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      try {
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+          ...options,
+          headers
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Ошибка сервера');
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('API Error:', error);
+        throw error;
+      }
+    }
+    
+    // Auth functions
+    async function login(username, password) {
+      const result = await apiCall('/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+      });
+      
+      localStorage.setItem('chat_token', result.token);
+      localStorage.setItem('chat_username', result.username);
+      if (result.avatar) {
+        localStorage.setItem('chat_avatar', result.avatar);
+      }
+      
+      return result;
+    }
+    
+    async function register(username, password) {
+      const result = await apiCall('/register', {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+      });
+      
+      localStorage.setItem('chat_token', result.token);
+      localStorage.setItem('chat_username', result.username);
+      
+      return result;
+    }
+    
+    function logout() {
+      localStorage.removeItem('chat_token');
+      localStorage.removeItem('chat_username');
+      localStorage.removeItem('chat_avatar');
+      window.location.reload();
+    }
+    
+    // Chat functions
+    async function loadChannels() {
+      return await apiCall('/channels');
+    }
+    
+    async function loadMessages(channel) {
+      return await apiCall(`/channels/${channel}/messages`);
+    }
+    
+    async function sendMessage(channel, text) {
+      return await apiCall(`/channels/${channel}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ text })
+      });
+    }
+    
+    async function createChannel(name, title, isPrivate = false) {
+      return await apiCall('/channels', {
+        method: 'POST',
+        body: JSON.stringify({ name, title, isPrivate })
+      });
+    }
+    
+    async function deleteChannel(channel) {
+      return await apiCall(`/channels/${channel}`, {
+        method: 'DELETE'
+      });
+    }
+    
+    async function deleteMessage(channel, messageId) {
+      return await apiCall(`/channels/${channel}/messages/${messageId}`, {
+        method: 'DELETE'
+      });
+    }
+    
+    async function updateAvatar(avatar) {
+      return await apiCall('/profile/avatar', {
+        method: 'POST',
+        body: JSON.stringify({ avatar })
+      });
+    }
+    
+    async function searchMessages(query, channel = null) {
+      const params = new URLSearchParams({ query });
+      if (channel) params.append('channel', channel);
+      return await apiCall(`/search/messages?${params}`);
+    }
+    
+    async function getAdminStats() {
+      return await apiCall('/admin/stats');
+    }
+    
+    async function editMessage(channel, messageId, text) {
+      return await apiCall(`/channels/${channel}/messages/${messageId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ text })
+      });
+    }
+    
+    // Utility functions
+    function isAdmin() {
+      return localStorage.getItem('chat_username') === ADMIN_USERNAME;
+    }
+    
+    function canDeleteChannel(channelData) {
+      const currentUser = localStorage.getItem('chat_username');
+      return isAdmin() || channelData.createdBy === currentUser;
+    }
+    
+    // UI functions
+    function showAuthModal() {
+      document.getElementById('authModal').classList.remove('hidden');
+      document.getElementById('app').classList.add('hidden');
+    }
+    
+    function hideAuthModal() {
+      document.getElementById('authModal').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+    }
+    
+    function showError(message) {
+      const errorEl = document.getElementById('authError');
+      errorEl.textContent = message;
+      setTimeout(() => {
+        errorEl.textContent = '';
+      }, 5000);
+    }
+    
+    function toggleMenu() {
+      document.getElementById('menu').classList.toggle('show');
+    }
+    
+    function renderChannels(channels, currentChannel) {
+      const channelsList = document.getElementById('channelsList');
+      channelsList.innerHTML = '';
+      
+      const currentUser = localStorage.getItem('chat_username');
+      
+      Object.keys(channels).forEach(key => {
+        const ch = channels[key];
+        const canDelete = canDeleteChannel(ch);
+        
+        const div = document.createElement('div');
+        div.className = 'channel' + (key === currentChannel ? ' active' : '') + (ch.isPrivate ? ' locked' : '');
+        div.dataset.key = key;
+        div.innerHTML = `
+          <div class="hash">${ch.isPrivate ? '🔒' : '#'}</div>
+          <div class="channel-name">${escapeHtml(ch.title)}</div>
+          <div class="channel-count">${ch.messages ? ch.messages.length : 0}</div>
+          ${ch.isPrivate ? '<div class="channel-lock">приватный</div>' : ''}
+          ${canDelete ? '<button class="channel-delete" title="Удалить канал">×</button>' : ''}
+        `;
+        
+        div.addEventListener('click', (e) => {
+          // Не переключаем канал если кликнули на кнопку удаления
+          if (!e.target.classList.contains('channel-delete')) {
+            switchChannel(key);
+            // Close menu on mobile after channel selection
+            if (window.innerWidth <= 768) {
+              document.getElementById('menu').classList.remove('show');
+            }
+          }
+        });
+        
+        // Добавляем обработчик для кнопки удаления
+        if (canDelete) {
+          const deleteBtn = div.querySelector('.channel-delete');
+          deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await handleDeleteChannel(key, ch);
+          });
+        }
+        
+        channelsList.appendChild(div);
+      });
+    }
+    
+    async function handleDeleteChannel(channelKey, channelData) {
+      const channelName = channelData.title;
+      const isGeneral = channelKey === 'general';
+      
+      if (isGeneral) {
+        alert('Нельзя удалить основной канал #general');
+        return;
+      }
+      
+      let message = `Вы уверены, что хотите удалить канал "${channelName}"?`;
+      if (channelData.messages && channelData.messages.length > 0) {
+        message += ` Все сообщения (${channelData.messages.length}) будут удалены.`;
+      }
+      
+      if (confirm(message)) {
+        try {
+          await deleteChannel(channelKey);
+          
+          // Обновляем список каналов
+          channels = await loadChannels();
+          
+          // Если удалили текущий канал, переключаемся на general
+          if (currentChannel === channelKey) {
+            currentChannel = 'general';
+            await switchChannel('general');
+          } else {
+            renderChannels(channels, currentChannel);
+          }
+          
+          // Показываем уведомление об успешном удалении
+          showNotification(`Канал "${channelName}" успешно удален`);
+        } catch (error) {
+          alert('Ошибка при удалении канала: ' + error.message);
+        }
+      }
+    }
+    
+    function showNotification(message) {
+      // Создаем временное уведомление
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #0b1220;
+        color: #d8e3ef;
+        padding: 12px 16px;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 3000;
+        max-width: 300px;
+      `;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+    }
+    
+    function renderMessages(messages, currentUser) {
+      const messagesEl = document.getElementById('messages');
+      messagesEl.innerHTML = '';
+      
+      if (messages.length === 0) {
+        messagesEl.innerHTML = '<div class="loading">Пока нет сообщений</div>';
+        return;
+      }
+      
+      messages.forEach(msg => {
+        const el = document.createElement('div');
+        el.className = 'message';
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+        if (msg.avatar) {
+          const img = document.createElement('img');
+          img.src = msg.avatar;
+          img.alt = msg.username;
+          avatar.appendChild(img);
+        } else {
+          avatar.textContent = initials(msg.username);
+        }
+        
+        const body = document.createElement('div');
+        body.className = 'message-body' + (msg.username === currentUser ? ' own-message' : '');
+        
+        const header = document.createElement('div');
+        header.className = 'message-header';
+        
+        const nickEl = document.createElement('div');
+        nickEl.className = 'nickname';
+        nickEl.textContent = msg.username;
+        
+        const timeEl = document.createElement('div');
+        timeEl.className = 'time';
+        timeEl.textContent = formatTime(msg.timestamp);
+        if (msg.edited) {
+          const editedBadge = document.createElement('span');
+          editedBadge.className = 'edited-badge';
+          editedBadge.textContent = '(ред.)';
+          timeEl.appendChild(editedBadge);
+        }
+        
+        header.appendChild(nickEl);
+        header.appendChild(timeEl);
+        
+        // Add edit and delete buttons for own messages
+        if (msg.username === currentUser || isAdmin()) {
+          const editBtn = document.createElement('button');
+          editBtn.className = 'edit-btn';
+          editBtn.textContent = '✎';
+          editBtn.title = 'Редактировать сообщение';
+          editBtn.addEventListener('click', async () => {
+            await handleEditMessage(msg);
+          });
+          header.appendChild(editBtn);
+          
+          const delBtn = document.createElement('button');
+          delBtn.className = 'delete-btn';
+          delBtn.textContent = '×';
+          delBtn.title = 'Удалить сообщение';
+          delBtn.addEventListener('click', async () => {
+            if (confirm('Удалить сообщение?')) {
+              try {
+                await deleteMessage(currentChannel, msg.id);
+                await refreshMessages();
+              } catch (error) {
+                alert('Ошибка при удалении: ' + error.message);
+              }
+            }
+          });
+          header.appendChild(delBtn);
+        }
+        
+        const text = document.createElement('div');
+        text.className = 'message-text';
+        text.innerHTML = linkify(escapeHtml(msg.text));
+        
+        body.appendChild(header);
+        body.appendChild(text);
+        el.appendChild(avatar);
+        el.appendChild(body);
+        messagesEl.appendChild(el);
+      });
+      
+      // Scroll to bottom
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+    
+    async function handleEditMessage(message) {
+      document.getElementById('editMessageInput').value = message.text;
+      document.getElementById('editModal').classList.remove('hidden');
+      
+      // Store current editing message
+      window.currentEditingMessage = message;
+    }
+    
+    // Utility functions
+    function escapeHtml(s) {
+      return (s + '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    
+    function linkify(text) {
+      return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#3b82f6;">$1</a>');
+    }
+    
+    function initials(name) {
+      if (!name) return 'U';
+      return (name.trim().split(' ').map(s => s[0]).slice(0, 2).join('') || name.slice(0, 1)).toUpperCase();
+    }
+    
+    function formatTime(timestamp) {
+      const d = new Date(timestamp);
+      return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+    
+    // Avatar cropping function
+    function cropAvatar(imageSrc) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Set canvas size to 200x200 (avatar size)
+          canvas.width = 200;
+          canvas.height = 200;
+          
+          // Calculate dimensions to crop and center
+          const size = Math.min(img.width, img.height);
+          const sx = (img.width - size) / 2;
+          const sy = (img.height - size) / 2;
+          
+          // Draw cropped and resized image
+          ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200);
+          
+          // Convert to base64
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.src = imageSrc;
+      });
+    }
+    
+    // Auto-resize textarea
+    function autoResizeTextarea(textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }
+    
+    // Global state
+    let currentChannel = 'general';
+    let channels = {};
+    let currentAvatarFile = null;
+    
+    // Channel switching
+    async function switchChannel(channel) {
+      currentChannel = channel;
+      const channelData = channels[channel];
+      
+      document.getElementById('currentChannel').textContent = (channelData.isPrivate ? '🔒' : '#') + channel;
+      
+      const description = channelData.title + ' — ' + (channelData.isPrivate ? 'приватный канал' : 'публичный канал');
+      document.getElementById('channelDescription').textContent = description;
+      
+      // Show/hide add user button for private channels
+      const addUserBtn = document.getElementById('addUserBtn');
+      if (channelData.isPrivate) {
+        addUserBtn.classList.remove('hidden');
+      } else {
+        addUserBtn.classList.add('hidden');
+      }
+      
+      renderChannels(channels, currentChannel);
+      await refreshMessages();
+    }
+    
+    async function refreshMessages() {
+      try {
+        const messages = await loadMessages(currentChannel);
+        const currentUser = localStorage.getItem('chat_username');
+        renderMessages(messages, currentUser);
+      } catch (error) {
+        console.error('Error loading messages:', error);
+        document.getElementById('messages').innerHTML = '<div class="loading">Ошибка загрузки сообщений</div>';
+      }
+    }
+    
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Check if user is authenticated
+      const token = localStorage.getItem('chat_token');
+      const username = localStorage.getItem('chat_username');
+      
+      if (!token || !username) {
+        showAuthModal();
+        return;
+      }
+      
+      // User is authenticated, load the chat
+      try {
+        hideAuthModal();
+        
+        // Show admin menu if admin
+        if (isAdmin()) {
+          document.getElementById('adminStatsBtn').style.display = 'flex';
+        }
+        
+        // Load channels and messages
+        channels = await loadChannels();
+        renderChannels(channels, currentChannel);
+        await refreshMessages();
+        
+        // Set up periodic refresh
+        setInterval(refreshMessages, 5000);
+      } catch (error) {
+        console.error('Error initializing chat:', error);
+        showAuthModal();
+      }
+    });
+    
+    // Auth event listeners
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const username = document.getElementById('loginUsername').value;
+      const password = document.getElementById('loginPassword').value;
+      
+      if (!username || !password) {
+        showError('Заполните все поля');
+        return;
+      }
+      
+      try {
+        await login(username, password);
+        hideAuthModal();
+        
+        // Reload channels and messages
+        channels = await loadChannels();
+        renderChannels(channels, currentChannel);
+        await refreshMessages();
+      } catch (error) {
+        showError(error.message);
+      }
+    });
+    
+    document.getElementById('registerBtn').addEventListener('click', async () => {
+      const username = document.getElementById('registerUsername').value;
+      const password = document.getElementById('registerPassword').value;
+      
+      if (!username || !password) {
+        showError('Заполните все поля');
+        return;
+      }
+      
+      try {
+        await register(username, password);
+        hideAuthModal();
+        
+        // Reload channels and messages
+        channels = await loadChannels();
+        renderChannels(channels, currentChannel);
+        await refreshMessages();
+      } catch (error) {
+        showError(error.message);
+      }
+    });
+    
+    document.getElementById('showRegister').addEventListener('click', () => {
+      document.getElementById('loginForm').classList.add('hidden');
+      document.getElementById('registerForm').classList.remove('hidden');
+      document.getElementById('authTitle').textContent = 'Регистрация';
+    });
+    
+    document.getElementById('showLogin').addEventListener('click', () => {
+      document.getElementById('registerForm').classList.add('hidden');
+      document.getElementById('loginForm').classList.remove('hidden');
+      document.getElementById('authTitle').textContent = 'Вход в чат';
+    });
+    
+    // Menu event listeners
+    document.getElementById('menuBtn').addEventListener('click', toggleMenu);
+    
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#menu') && !e.target.closest('#menuBtn')) {
+        document.getElementById('menu').classList.remove('show');
+      }
+    });
+    
+    // Chat event listeners
+    document.getElementById('sendBtn').addEventListener('click', async () => {
+      const messageInput = document.getElementById('messageInput');
+      const text = messageInput.value.trim();
+      
+      if (!text) return;
+      
+      try {
+        await sendMessage(currentChannel, text);
+        messageInput.value = '';
+        autoResizeTextarea(messageInput);
+        await refreshMessages();
+      } catch (error) {
+        alert('Ошибка отправки: ' + error.message);
+      }
+    });
+    
+    const messageInput = document.getElementById('messageInput');
+    messageInput.addEventListener('input', () => {
+      autoResizeTextarea(messageInput);
+    });
+    
+    messageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        if (e.shiftKey) {
+          // Allow new line with Shift+Enter
+          return;
+        } else {
+          // Send message with Enter
+          e.preventDefault();
+          document.getElementById('sendBtn').click();
+        }
+      }
+    });
+    
+    // Channel creation
+    let selectedChannelType = 'public';
+    
+    document.getElementById('addChannel').addEventListener('click', () => {
+      document.getElementById('channelModal').classList.remove('hidden');
+      document.getElementById('channelNameInput').value = '';
+      document.getElementById('channelTitleInput').value = '';
+      selectedChannelType = 'public';
+      document.getElementById('publicChannelType').classList.add('selected');
+      document.getElementById('privateChannelType').classList.remove('selected');
+    });
+    
+    document.getElementById('publicChannelType').addEventListener('click', () => {
+      selectedChannelType = 'public';
+      document.getElementById('publicChannelType').classList.add('selected');
+      document.getElementById('privateChannelType').classList.remove('selected');
+    });
+    
+    document.getElementById('privateChannelType').addEventListener('click', () => {
+      selectedChannelType = 'private';
+      document.getElementById('privateChannelType').classList.add('selected');
+      document.getElementById('publicChannelType').classList.remove('selected');
+    });
+    
+    document.getElementById('channelCancelBtn').addEventListener('click', () => {
+      document.getElementById('channelModal').classList.add('hidden');
+    });
+    
+    document.getElementById('channelCreateBtn').addEventListener('click', async () => {
+      const name = document.getElementById('channelNameInput').value.trim();
+      const title = document.getElementById('channelTitleInput').value.trim();
+      
+      if (!name || !title) {
+        alert('Заполните имя и заголовок канала');
+        return;
+      }
+      
+      try {
+        await createChannel(name, title, selectedChannelType === 'private');
+        channels = await loadChannels();
+        renderChannels(channels, currentChannel);
+        document.getElementById('channelModal').classList.add('hidden');
+        switchChannel(name);
+      } catch (error) {
+        alert('Ошибка создания канала: ' + error.message);
+      }
+    });
+    
+    // Avatar change with cropping
+    document.getElementById('changeAvatarBtn').addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      
+      input.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        currentAvatarFile = file;
+        const base64 = await fileToBase64(file);
+        
+        // Show crop modal
+        document.getElementById('avatarCropImage').src = base64;
+        document.getElementById('avatarModal').classList.remove('hidden');
+        document.getElementById('menu').classList.remove('show');
+      });
+      
+      input.click();
+    });
+    
+    document.getElementById('avatarCancelBtn').addEventListener('click', () => {
+      document.getElementById('avatarModal').classList.add('hidden');
+      currentAvatarFile = null;
+    });
+    
+    document.getElementById('avatarSaveBtn').addEventListener('click', async () => {
+      if (!currentAvatarFile) return;
+      
+      try {
+        const base64 = await fileToBase64(currentAvatarFile);
+        const croppedAvatar = await cropAvatar(base64);
+        await updateAvatar(croppedAvatar);
+        localStorage.setItem('chat_avatar', croppedAvatar);
+        document.getElementById('avatarModal').classList.add('hidden');
+        currentAvatarFile = null;
+        await refreshMessages();
+      } catch (error) {
+        alert('Ошибка загрузки аватара: ' + error.message);
+      }
+    });
+    
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      if (confirm('Выйти из аккаунта?')) {
+        logout();
+      }
+    });
+    
+    // Search functionality
+    document.getElementById('searchBtn').addEventListener('click', () => {
+      document.getElementById('searchModal').classList.remove('hidden');
+      document.getElementById('searchInput').value = '';
+      document.getElementById('searchInput').focus();
+    });
+    
+    document.getElementById('searchCancelBtn').addEventListener('click', () => {
+      document.getElementById('searchModal').classList.add('hidden');
+    });
+    
+    let searchTimeout;
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      const query = e.target.value.trim();
+      
+      if (query.length < 2) {
+        document.getElementById('searchResults').innerHTML = '<div class="loading">Введите минимум 2 символа</div>';
+        return;
+      }
+      
+      searchTimeout = setTimeout(async () => {
+        try {
+          const results = await searchMessages(query);
+          renderSearchResults(results);
+        } catch (error) {
+          document.getElementById('searchResults').innerHTML = '<div class="loading">Ошибка поиска</div>';
+        }
+      }, 500);
+    });
+    
+    function renderSearchResults(results) {
+      const container = document.getElementById('searchResults');
+      
+      if (results.length === 0) {
+        container.innerHTML = '<div class="loading">Сообщения не найдены</div>';
+        return;
+      }
+      
+      container.innerHTML = '';
+      
+      results.forEach(result => {
+        const div = document.createElement('div');
+        div.className = 'search-result';
+        div.innerHTML = `
+          <div class="search-result-channel">#${result.channelTitle}</div>
+          <div style="font-weight:600;margin-bottom:4px;">${result.username}</div>
+          <div style="color:#d8e3ef;font-size:14px;">${escapeHtml(result.text)}</div>
+          <div style="font-size:11px;color:#86a0bb;margin-top:4px;">${formatTime(result.timestamp)}</div>
+        `;
+        
+        div.addEventListener('click', () => {
+          switchChannel(result.channel);
+          document.getElementById('searchModal').classList.add('hidden');
+        });
+        
+        container.appendChild(div);
+      });
+    }
+    
+    // Admin stats
+    document.getElementById('adminStatsBtn').addEventListener('click', async () => {
+      try {
+        const stats = await getAdminStats();
+        alert(`Статистика системы:
+Пользователей: ${stats.totalUsers}
+Каналов: ${stats.totalChannels}
+Сообщений: ${stats.totalMessages}
+Активных каналов: ${stats.activeChannels}`);
+      } catch (error) {
+        alert('Ошибка загрузки статистики: ' + error.message);
+      }
+    });
+    
+    // Edit message functionality
+    document.getElementById('editCancelBtn').addEventListener('click', () => {
+      document.getElementById('editModal').classList.add('hidden');
+      window.currentEditingMessage = null;
+    });
+    
+    document.getElementById('editSaveBtn').addEventListener('click', async () => {
+      const text = document.getElementById('editMessageInput').value.trim();
+      
+      if (!text) {
+        alert('Текст сообщения не может быть пустым');
+        return;
+      }
+      
+      if (!window.currentEditingMessage) return;
+      
+      try {
+        await editMessage(currentChannel, window.currentEditingMessage.id, text);
+        document.getElementById('editModal').classList.add('hidden');
+        window.currentEditingMessage = null;
+        await refreshMessages();
+      } catch (error) {
+        alert('Ошибка редактирования: ' + error.message);
+      }
+    });
+    
+    // Add user button (visual only for now)
+    document.getElementById('addUserBtn').addEventListener('click', () => {
+      alert('Функция добавления пользователей будет доступна в следующем обновлении');
+    });
+  </script>
+</body>
+</html>
