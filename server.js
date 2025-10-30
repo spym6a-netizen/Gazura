@@ -11,6 +11,10 @@ const JWT_SECRET = 'your-secret-key-change-in-production';
 const DATA_DIR = './chat_data';
 const ADMIN_USERNAME = 'pym6a';
 
+// Глобальные переменные для реального времени
+const activeTypers = new Map(); // channel -> {username, timestamp}
+const messageSubscribers = new Map(); // channel -> [res, res, ...]
+
 // Создаем директорию для данных, если её нет
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -57,6 +61,42 @@ function loadChannels() {
 // Сохраняем каналы
 function saveChannels(channels) {
   fs.writeFileSync(path.join(DATA_DIR, 'channels.json'), JSON.stringify(channels, null, 2));
+}
+
+// Функция для уведомления подписчиков о новых сообщениях
+function notifySubscribers(channel, data) {
+  if (messageSubscribers.has(channel)) {
+    const subscribers = messageSubscribers.get(channel);
+    messageSubscribers.set(channel, subscribers.filter(res => {
+      try {
+        res.json(data);
+        return false; // Удаляем после отправки
+      } catch (e) {
+        return false; // Удаляем если ошибка
+      }
+    }));
+    
+    if (messageSubscribers.get(channel).length === 0) {
+      messageSubscribers.delete(channel);
+    }
+  }
+}
+
+// Функция для получения статуса набора текста
+function getTypingStatus(channel) {
+  if (!activeTypers.has(channel)) return [];
+  
+  const now = Date.now();
+  const typers = Array.from(activeTypers.get(channel).entries())
+    .filter(([username, timestamp]) => now - timestamp < 3000) // 3 секунды активности
+    .map(([username]) => username);
+  
+  // Очищаем старые записи
+  if (typers.length === 0) {
+    activeTypers.delete(channel);
+  }
+  
+  return typers;
 }
 
 // Middleware для проверки JWT токена
@@ -172,6 +212,42 @@ app.get('/api/channels/:channel/messages', authenticateToken, (req, res) => {
   res.json(channel.messages);
 });
 
+// Long polling для новых сообщений и статуса набора
+app.get('/api/channels/:channel/updates', authenticateToken, (req, res) => {
+  const channel = req.params.channel;
+  const lastUpdate = parseInt(req.query.lastUpdate) || Date.now();
+  
+  // Проверяем доступ к каналу
+  const channels = loadChannels();
+  const channelData = channels[channel];
+  
+  if (!channelData) {
+    return res.status(404).json({ error: 'Канал не найден' });
+  }
+  
+  if (channelData.isPrivate && channelData.createdBy !== req.user.username && req.user.username !== ADMIN_USERNAME) {
+    return res.status(403).json({ error: 'Нет доступа' });
+  }
+  
+  // Добавляем в подписчики
+  if (!messageSubscribers.has(channel)) {
+    messageSubscribers.set(channel, []);
+  }
+  messageSubscribers.get(channel).push(res);
+  
+  // Таймаут 25 секунд
+  setTimeout(() => {
+    if (messageSubscribers.has(channel)) {
+      const subscribers = messageSubscribers.get(channel);
+      const index = subscribers.indexOf(res);
+      if (index > -1) {
+        subscribers.splice(index, 1);
+        res.json({ type: 'timeout', timestamp: Date.now() });
+      }
+    }
+  }, 25000);
+});
+
 // Отправка сообщения
 app.post('/api/channels/:channel/messages', authenticateToken, (req, res) => {
   const { text } = req.body;
@@ -206,7 +282,61 @@ app.post('/api/channels/:channel/messages', authenticateToken, (req, res) => {
   channel.messages.push(message);
   saveChannels(channels);
   
+  // Уведомляем всех подписчиков
+  notifySubscribers(req.params.channel, {
+    type: 'new_message',
+    message: message,
+    channel: req.params.channel
+  });
+  
   res.json(message);
+});
+
+// Управление статусом набора текста
+app.post('/api/channels/:channel/typing', authenticateToken, (req, res) => {
+  const { isTyping } = req.body;
+  const channel = req.params.channel;
+  
+  if (!activeTypers.has(channel)) {
+    activeTypers.set(channel, new Map());
+  }
+  
+  const channelTypers = activeTypers.get(channel);
+  
+  if (isTyping) {
+    channelTypers.set(req.user.username, Date.now());
+    
+    // Уведомляем подписчиков о начале набора
+    notifySubscribers(channel, {
+      type: 'typing_update',
+      users: getTypingStatus(channel),
+      channel: channel
+    });
+    
+    // Автоматически очищаем через 3 секунды
+    setTimeout(() => {
+      if (channelTypers.has(req.user.username)) {
+        const timestamp = channelTypers.get(req.user.username);
+        if (Date.now() - timestamp >= 3000) {
+          channelTypers.delete(req.user.username);
+          notifySubscribers(channel, {
+            type: 'typing_update',
+            users: getTypingStatus(channel),
+            channel: channel
+          });
+        }
+      }
+    }, 3000);
+  } else {
+    channelTypers.delete(req.user.username);
+    notifySubscribers(channel, {
+      type: 'typing_update',
+      users: getTypingStatus(channel),
+      channel: channel
+    });
+  }
+  
+  res.json({ success: true });
 });
 
 // Создание канала
@@ -329,6 +459,13 @@ app.delete('/api/channels/:channel/messages/:messageId', authenticateToken, (req
   channel.messages.splice(messageIndex, 1);
   saveChannels(channels);
   
+  // Уведомляем подписчиков об удалении
+  notifySubscribers(req.params.channel, {
+    type: 'message_deleted',
+    messageId: req.params.messageId,
+    channel: req.params.channel
+  });
+  
   res.json({ success: true });
 });
 
@@ -436,6 +573,13 @@ app.put('/api/channels/:channel/messages/:messageId', authenticateToken, (req, r
   };
   
   saveChannels(channels);
+  
+  // Уведомляем подписчиков об редактировании
+  notifySubscribers(req.params.channel, {
+    type: 'message_updated',
+    message: channel.messages[messageIndex],
+    channel: req.params.channel
+  });
   
   res.json(channel.messages[messageIndex]);
 });
