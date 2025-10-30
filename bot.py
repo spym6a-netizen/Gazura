@@ -21,25 +21,23 @@ import atexit
 def start_website_server():
     """Запуск веб-сервера"""
     try:
-        # Проверяем существует ли файл server.js
         if os.path.exists("server.js"):
             print("🚀 Запускаю веб-сервер...")
-            # Запускаем сервер в отдельном процессе
+            
+            # Запускаем в фоне без ожидания
             website_process = subprocess.Popen(
-                [sys.executable if sys.platform == 'win32' else 'node', 'server.js'],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
+                ['node', 'server.js'],
+                stdout=open('website.log', 'w'),
+                stderr=subprocess.STDOUT,
+                start_new_session=True  # Важно для фонового процесса
             )
             
-            # Функция для остановки сервера при выходе
             def stop_website():
                 print("🛑 Останавливаю веб-сервер...")
                 website_process.terminate()
-                website_process.wait()
             
             atexit.register(stop_website)
-            print("✅ Веб-сервер запущен!")
+            print("✅ Веб-сервер запущен в фоне!")
             return website_process
         else:
             print("❌ Файл server.js не найден!")
